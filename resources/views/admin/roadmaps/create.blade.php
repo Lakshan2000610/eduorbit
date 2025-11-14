@@ -18,21 +18,21 @@
             <div>
                 <label for="grade" class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
                 <select id="grade" name="grade"
-                        class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:border-transparent transition-all">
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">
                     <option value="">Select Grade</option>
                     @for ($i = 1; $i <= 13; $i++)
-                        <option value="Grade {{ $i }}">Grade {{ $i }}</option>
+                        <option value="Grade {{ $i }}" {{ (isset($grade) && $grade == "Grade $i") ? 'selected' : '' }}>Grade {{ $i }}</option>
                     @endfor
                 </select>
             </div>
             <div>
                 <label for="language" class="block text-sm font-medium text-gray-700 mb-1">Language</label>
                 <select id="language" name="language"
-                        class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:border-transparent transition-all">
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">
                     <option value="">Select Language</option>
-                    <option value="Sinhala">Sinhala</option>
-                    <option value="English">English</option>
-                    <option value="Tamil">Tamil</option>
+                    <option value="Sinhala" {{ (isset($language) && $language == 'Sinhala') ? 'selected' : '' }}>Sinhala</option>
+                    <option value="English" {{ (isset($language) && $language == 'English') ? 'selected' : '' }}>English</option>
+                    <option value="Tamil" {{ (isset($language) && $language == 'Tamil') ? 'selected' : '' }}>Tamil</option>
                 </select>
             </div>
         </div>
@@ -51,16 +51,9 @@
             <form id="addSubjectForm" action="{{ route('admin.roadmaps.add-subject') }}" method="GET" class="inline">
                 <input type="hidden" name="grade" id="selectedGrade">
                 <input type="hidden" name="language" id="selectedLanguage">
-                <button type="submit"
-                        class="inline-flex items-center justify-center gap-2 bg-admin-primary hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition"
-                        onclick="event.preventDefault(); 
-                                 const grade = document.getElementById('grade').value;
-                                 const language = document.getElementById('language').value;
-                                 if (!grade || !language) { alert('Please select both grade and language first.'); return; }
-                                 document.getElementById('selectedGrade').value = grade;
-                                 document.getElementById('selectedLanguage').value = language;
-                                 this.closest('form').submit();">
-                    <i class="fas fa-plus"></i> Add New Subject
+                <button type="submit" id="addSubjectBtn"
+                        class="bg-admin-primary hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">
+                    Add Subject
                 </button>
             </form>
         </div>
@@ -87,26 +80,52 @@
                         <th class="px-4 py-3 font-medium">Subject Name</th>
                         <th class="px-4 py-3 font-medium text-center">Topics</th>
                         <th class="px-4 py-3 font-medium text-center">Status</th>
+                        <th class="px-4 py-3 font-medium text-center">Type</th>
                         <th class="px-4 py-3 font-medium text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody class="divide-y divide-gray-100" id="subjects-table-body">
                     @foreach ($subjects as $subject)
-                        <tr>
+                        @php
+                            $hasChildren = $subject->children()->count() > 0;
+                            $topicsCount = $hasChildren ? null : $subject->topics->count();
+                        @endphp
+                        <tr data-grade="{{ $subject->grade }}" data-language="{{ $subject->language }}"
+                            data-name="{{ strtolower($subject->subject_name) }}" data-code="{{ strtolower($subject->subject_code) }}"
+                            data-status="{{ $subject->status }}" data-type="{{ $subject->is_subsubject ? 'sub' : 'main' }}">
                             <td class="px-4 py-3">{{ $subject->subject_code }}</td>
                             <td class="px-4 py-3 font-medium text-gray-800">{{ $subject->subject_name }}</td>
-                            <td class="px-4 py-3 text-center">{{ $subject->topics->count() }}</td>
+                            <td class="px-4 py-3 text-center">
+                                @if($hasChildren)
+                                    &mdash;
+                                @else
+                                    {{ $topicsCount }}
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-center">
                                 <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full cursor-pointer"
                                       onclick="this.innerText = this.innerText === 'Active' ? 'Inactive' : 'Active'; this.className = this.innerText === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';">
                                     {{ ucfirst($subject->status) }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 text-center">
+                                {{ $subject->is_subsubject ? 'Subsubject' : 'Main' }}
+                                @if($subject->is_subsubject && $subject->parent)
+                                    <div class="text-xs text-gray-500">({{ $subject->parent->subject_name }})</div>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-right space-x-2">
-                                <a href="{{ route('admin.roadmaps.manage-topics', $subject->id) }}" class="text-admin-primary hover:underline text-sm">
-                                    <i class="fas fa-list mr-1"></i> Manage Topics
+                                @if($hasChildren)
+                                    <span class="text-gray-400 text-sm opacity-50 cursor-not-allowed">Manage Topics</span>
+                                @else
+                                    <a href="{{ route('admin.roadmaps.manage-topics', $subject->id) }}" class="text-admin-primary hover:underline text-sm">
+                                        <i class="fas fa-list mr-1"></i> Manage Topics
+                                    </a>
+                                @endif
+
+                                <a href="{{ route('admin.roadmaps.edit-subject', $subject->id) }}" title="Edit" class="ml-3 text-gray-600 hover:text-gray-800">
+                                    <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="#" class="text-gray-400 hover:text-gray-600"><i class="fas fa-edit"></i></a>
                             </td>
                         </tr>
                     @endforeach
@@ -115,4 +134,77 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const gradeSelect = document.getElementById('grade');
+        const languageSelect = document.getElementById('language');
+        const addBtn = document.getElementById('addSubjectBtn');
+        const searchInput = document.querySelector('input[placeholder="Search subjects..."]');
+        const codeInput = document.querySelector('input[placeholder^="Subject Code"]');
+        const statusSelect = document.querySelector('select[name="statusFilter"]') || document.querySelector('select:has(option[value="active"])'); // graceful
+        const tableBody = document.getElementById('subjects-table-body');
+
+        function reloadWithParams() {
+            const g = gradeSelect ? gradeSelect.value : '';
+            const l = languageSelect ? languageSelect.value : '';
+            const params = new URLSearchParams(window.location.search);
+            if (g) params.set('grade', g); else params.delete('grade');
+            if (l) params.set('language', l); else params.delete('language');
+            window.location.search = params.toString();
+        }
+
+        function syncHiddenInputs() {
+            const selectedGrade = document.getElementById('selectedGrade');
+            const selectedLanguage = document.getElementById('selectedLanguage');
+            if (selectedGrade) selectedGrade.value = gradeSelect.value;
+            if (selectedLanguage) selectedLanguage.value = languageSelect.value;
+
+            if (!gradeSelect.value || !languageSelect.value) {
+                addBtn.disabled = true;
+                addBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                addBtn.disabled = false;
+                addBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function applyFilters() {
+            const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            const codeQ = codeInput ? codeInput.value.trim().toLowerCase() : '';
+            const gradeFilter = gradeSelect ? gradeSelect.value : '';
+            const langFilter = languageSelect ? languageSelect.value : '';
+            const statusFilter = document.querySelector('select[name="statusFilter"]') ? document.querySelector('select[name="statusFilter"]').value : '';
+
+            Array.from(tableBody.querySelectorAll('tr')).forEach(row => {
+                const name = row.dataset.name || '';
+                const code = row.dataset.code || '';
+                const g = row.dataset.grade || '';
+                const l = row.dataset.language || '';
+                const status = row.dataset.status || '';
+                let visible = true;
+
+                if (q && !(name.includes(q) || code.includes(q))) visible = false;
+                if (codeQ && !code.includes(codeQ)) visible = false;
+                if (gradeFilter && g !== gradeFilter) visible = false;
+                if (langFilter && l !== langFilter) visible = false;
+                if (statusFilter && status !== statusFilter) visible = false;
+
+                row.style.display = visible ? '' : 'none';
+            });
+        }
+
+        if (gradeSelect) gradeSelect.addEventListener('change', function() { syncHiddenInputs(); reloadWithParams(); });
+        if (languageSelect) languageSelect.addEventListener('change', function() { syncHiddenInputs(); reloadWithParams(); });
+
+        if (searchInput) searchInput.addEventListener('input', applyFilters);
+        if (codeInput) codeInput.addEventListener('input', applyFilters);
+        const statusFilter = document.querySelector('select[name="statusFilter"]');
+        if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+
+        // initialize
+        syncHiddenInputs();
+        applyFilters();
+    });
+</script>
 @endsection

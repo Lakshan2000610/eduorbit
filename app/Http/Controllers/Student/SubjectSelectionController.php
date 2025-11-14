@@ -9,76 +9,83 @@ use App\Models\StudentSubjectSelection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class DashboardController extends Controller
+class SubjectSelectionController extends Controller
 {
-    public function index()
+    // Step 1: show grade + language form
+    public function showGradeForm()
     {
         $userId = Auth::id();
-
-        // if student doesn't have any current selections, send them to the selection page
         $hasCurrent = StudentSubjectSelection::where('student_id', $userId)
             ->where('is_current', true)
             ->exists();
 
-        if (! $hasCurrent) {
-            return redirect()->route('student.select-subjects');
+        if ($hasCurrent) {
+            return redirect()->route('student.dashboard');
         }
 
-        // otherwise show student dashboard
-        return view('student.dashboard');
+        return view('student.select-subjects-step1');
     }
-}
 
-class SubjectSelectionController extends Controller
-{
-    public function showSelectionForm(Request $request)
+    // Step 2: preview subjects for chosen grade+language
+    public function previewSubjects(Request $request)
     {
-        // optional: read grade/lang from query or student's profile
-        $grade = $request->query('grade', null);
-        $language = $request->query('language', null);
+        $request->validate([
+            'grade' => 'required|string',
+            'language' => 'required|string',
+        ]);
 
-        // load mains for selects (you can pre-filter if grade+language present)
-        $mainSubjects = Subject::where(function($q){
+        $grade = $request->input('grade');
+        $language = $request->input('language');
+
+        $mainSubjects = Subject::where(function ($q) {
                 $q->where('is_subsubject', false)->orWhereNull('is_subsubject');
             })
             ->when($grade, fn($q) => $q->where('grade', $grade))
             ->when($language, fn($q) => $q->where('language', $language))
-            ->with('children') // subsubjects
+            ->with('children')
             ->orderBy('subject_name')
             ->get();
 
-        // user's current selections (if any)
         $userId = Auth::id();
         $current = StudentSubjectSelection::where('student_id', $userId)
-                    ->where('is_current', true)
-                    ->get()
-                    ->pluck('subject_id')
-                    ->toArray();
+            ->where('is_current', true)
+            ->pluck('subject_id')
+            ->toArray();
 
         return view('student.select-subjects', compact('mainSubjects', 'grade', 'language', 'current'));
     }
 
+    // Final store: sanitize, validate and persist selections (keeps history)
     public function storeSelection(Request $request)
     {
         $request->validate([
             'grade' => 'required|string',
             'language' => 'required|string',
-            'subject_ids' => 'required|array|min:1',
-            'subject_ids.*' => 'required|integer|exists:subjects,id',
         ]);
 
         $userId = Auth::id();
-        $grade = $request->grade;
-        $language = $request->language;
-        $subjectIds = array_map('intval', $request->subject_ids);
+        $grade = $request->input('grade');
+        $language = $request->input('language');
 
-        DB::transaction(function() use ($userId, $grade, $language, $subjectIds) {
-            // mark previous selections for this student as not current
+        $raw = $request->input('subject_ids', []);
+        $subjectIds = array_values(array_filter(array_map(function ($v) {
+            return $v === '' || $v === null ? null : intval($v);
+        }, (array) $raw)));
+
+        if (empty($subjectIds)) {
+            return back()->withInput()->withErrors(['subject_ids' => 'Please select at least one subject.']);
+        }
+
+        $validCount = Subject::whereIn('id', $subjectIds)->count();
+        if ($validCount !== count($subjectIds)) {
+            return back()->withInput()->withErrors(['subject_ids' => 'One or more selected subjects are invalid.']);
+        }
+
+        DB::transaction(function () use ($userId, $grade, $language, $subjectIds) {
             StudentSubjectSelection::where('student_id', $userId)
                 ->where('is_current', true)
                 ->update(['is_current' => false]);
 
-            // insert new selections as current
             $now = now();
             $rows = [];
             foreach ($subjectIds as $sid) {
@@ -92,14 +99,29 @@ class SubjectSelectionController extends Controller
                     'updated_at' => $now,
                 ];
             }
-            // bulk insert
+
             StudentSubjectSelection::insert($rows);
         });
 
         return redirect()->route('student.dashboard')->with('success', 'Subjects confirmed.');
     }
 
-    // optional: return student's selections (history)
+    // show student's current selected subjects (roadmap)
+    public function showCurrentSelection()
+    {
+        $userId = Auth::id();
+        $selections = StudentSubjectSelection::with('subject')
+            ->where('student_id', $userId)
+            ->where('is_current', true)
+            ->get();
+
+        $grade = $selections->first()->grade ?? null;
+        $language = $selections->first()->language ?? null;
+
+        return view('student.selected-subjects', compact('selections', 'grade', 'language'));
+    }
+
+    // optional: history
     public function mySelections()
     {
         $userId = Auth::id();

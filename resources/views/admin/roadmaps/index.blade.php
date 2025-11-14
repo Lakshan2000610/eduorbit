@@ -34,6 +34,12 @@
                 <option value="English">English</option>
                 <option value="Tamil">Tamil</option>
             </select>
+
+            <select id="filter-type" class="border border-gray-200 rounded-lg px-3 py-2 bg-white shadow-sm text-gray-600">
+                <option value="">Type</option>
+                <option value="main">Main Subject</option>
+                <option value="sub">Subsubject</option>
+            </select>
         </div>
     </div>
 
@@ -44,8 +50,9 @@
                 <tr>
                     <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Grade</th>
                     <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Total Subjects</th>
-                    <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Total Topics</th> <!-- New column -->
+                    <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Total Topics</th>
                     <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Total Subtopics</th>
+                    <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Type</th>
                     <th class="py-3 px-6 text-gray-600 text-sm font-semibold">Language</th>
                     <th class="py-3 px-6 text-gray-600 text-sm font-semibold text-right">Actions</th>
                 </tr>
@@ -55,12 +62,15 @@
                     <tr class="border-b border-gray-100 hover:bg-gray-50 transition" data-grade="{{ $gradeData['grade'] }}" data-language="{{ $gradeData['language'] }}">
                         <td class="py-3 px-6 text-gray-800">{{ $gradeData['grade'] }}</td>
                         <td class="py-3 px-6 text-gray-800">{{ $gradeData['total_subjects'] }}</td>
-                        <td class="py-3 px-6 text-gray-800">{{ $gradeData['total_topics'] }}</td> <!-- Display total topics -->
+                        <td class="py-3 px-6 text-gray-800">{{ $gradeData['total_topics'] }}</td>
                         <td class="py-3 px-6 text-gray-800">{{ $gradeData['total_subtopics'] }}</td>
+                        <td class="py-3 px-6 text-gray-800">
+                            Main: {{ $gradeData['main_subjects'] ?? 0 }} / Sub: {{ $gradeData['sub_subjects'] ?? 0 }}
+                        </td>
                         <td class="py-3 px-6 text-gray-800">{{ $gradeData['language'] }}</td>
                         <td class="py-3 px-6 text-right space-x-3">
                             <a href="{{ route('admin.roadmaps.view', ['grade' => str_replace(' ', '-', $gradeData['grade']), 'language' => $gradeData['language']]) }}" class="text-blue-600 font-medium hover:underline">View</a>
-                            <a href="{{ route('admin.roadmaps.create') }}?grade={{ urlencode($gradeData['grade']) }}" class="text-green-600 font-medium hover:underline">Edit</a>
+                            <a href="{{ route('admin.roadmaps.subjects.index', ['grade' => $gradeData['grade'], 'language' => $gradeData['language']]) }}" class="text-indigo-600 font-medium hover:underline">Manage Subjects</a>
                             <a href="#" class="delete-roadmap text-red-600 font-medium hover:underline" data-grade="{{ $gradeData['grade'] }}" data-language="{{ $gradeData['language'] }}">Delete</a>
                         </td>
                     </tr>
@@ -76,21 +86,25 @@
         const searchInput = document.getElementById('search');
         const filterGrade = document.getElementById('filter-grade');
         const filterLanguage = document.getElementById('filter-language');
+        const filterType = document.getElementById('filter-type');
         const tableRows = document.querySelectorAll('#roadmap-table-body tr');
 
         function filterTable() {
             const searchTerm = searchInput.value.toLowerCase();
             const gradeFilter = filterGrade.value.toLowerCase();
             const languageFilter = filterLanguage.value.toLowerCase();
+            const typeFilter = filterType.value; // new
 
             tableRows.forEach(row => {
                 const grade = row.getAttribute('data-grade').toLowerCase();
                 const language = row.getAttribute('data-language').toLowerCase();
+                const type = row.getAttribute('data-type') || ''; // we will add data-type on rows when available
                 const matchesSearch = grade.includes(searchTerm) || language.includes(searchTerm);
                 const matchesGrade = !gradeFilter || grade === gradeFilter;
                 const matchesLanguage = !languageFilter || language === languageFilter;
+                const matchesType = !typeFilter || type === typeFilter;
 
-                if (matchesSearch && matchesGrade && matchesLanguage) {
+                if (matchesSearch && matchesGrade && matchesLanguage && matchesType) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
@@ -101,6 +115,7 @@
         searchInput.addEventListener('input', filterTable);
         filterGrade.addEventListener('change', filterTable);
         filterLanguage.addEventListener('change', filterTable);
+        filterType.addEventListener('change', filterTable);
 
         // Delete confirmation
         document.querySelectorAll('.delete-roadmap').forEach(link => {

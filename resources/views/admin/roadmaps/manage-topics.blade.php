@@ -49,14 +49,19 @@
                             <td class="px-4 py-3">{{ $topic->topic_code }}</td>
                             <td class="px-4 py-3 font-medium text-gray-800">{{ $topic->topic_name }}</td>
                             <td class="px-4 py-3">
-                                <a href="{{ route('admin.roadmaps.add-subtopic', $topic->id) }}" class="text-admin-primary hover:underline">
-                                    <i class="fas fa-plus-circle mr-1"></i> Add Subtopics
+                                <a href="{{ route('admin.roadmaps.subtopics.index', $topic->id) }}" class="text-admin-primary hover:underline">
+                                    View Subtopics
                                 </a>
                             </td>
                             <td class="px-4 py-3">{{ $topic->subtopics->count() }}</td>
                             <td class="px-4 py-3 text-right space-x-2">
-                                <a href="#" class="text-gray-400 hover:text-gray-600"><i class="fas fa-edit"></i></a>
-                                <a href="#" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></a>
+                                <a href="{{ route('admin.roadmaps.edit-topic', $topic->id) }}" class="text-gray-600 hover:text-gray-800"><i class="fas fa-edit"></i></a>
+
+                                <form action="{{ route('admin.roadmaps.delete-topic', $topic->id) }}" method="POST" class="inline-block" onsubmit="return confirm('This will delete the topic and all its subtopics. Are you sure?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                                </form>
                             </td>
                         </tr>
                     @endforeach

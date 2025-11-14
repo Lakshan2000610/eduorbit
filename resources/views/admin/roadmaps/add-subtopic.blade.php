@@ -4,7 +4,12 @@
 <div class="min-h-screen bg-admin-background p-6">
     <!-- Page Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-admin-text">Add/Edit Subtopic Details & Resources</h1>
+        <div class="flex items-center gap-3">
+            <button onclick="history.back()" class="inline-flex items-center gap-2 text-sm text-gray-600 hover:underline">
+                <i class="fas fa-arrow-left"></i> Back
+            </button>
+            <h1 class="text-3xl font-bold text-admin-text">Add/Edit Subtopic Details & Resources</h1>
+        </div>
         <p class="text-sm text-admin-text-secondary mt-1">
             Manage the details, content, and learning outcomes for this subtopic.
         </p>
@@ -34,8 +39,8 @@
                         {{ $topic->topic_code }}-
                     </span>
                     <input type="text" id="subtopic_code" name="subtopic_code" required
-                           class="rounded-none rounded-r-lg w-full px-3 py-2 border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:border-transparent transition-all"
-                           placeholder="e.g., at32">
+                           class="rounded-none rounded-r-lg w-full px-3 py-2 border border-gray-200 bg-white text-gray-700"
+                           placeholder="e.g., at32" value="{{ old('subtopic_code') }}">
                 </div>
             </div>
 
@@ -43,41 +48,64 @@
             <div>
                 <label for="subtopic_name" class="block text-sm font-medium text-gray-700 mb-1">Subtopic Name</label>
                 <input type="text" id="subtopic_name" name="subtopic_name" required
-                       class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:border-transparent transition-all"
-                       placeholder="e.g., Introduction to JavaScript">
+                       class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700"
+                       placeholder="e.g., Introduction to JavaScript" value="{{ old('subtopic_name') }}">
             </div>
 
             <!-- Description -->
             <div>
                 <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea id="description" name="description"
-                          class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:border-transparent transition-all"
-                          placeholder="A brief overview of the subtopic..."></textarea>
+                          class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700"
+                          placeholder="A brief overview of the subtopic...">{{ old('description') }}</textarea>
             </div>
 
             <!-- Content & Resources -->
             <div>
                 <h2 class="text-lg font-semibold text-gray-800 mb-4">Content & Resources</h2>
                 <div id="contents-container">
-                    <div class="mb-4">
-                        <label for="content_title" class="block text-sm font-medium text-gray-700 mb-1">Content Title</label>
-                        <input type="text" name="contents[0][title]" required
-                               class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700" placeholder="e.g., What is a variable?">
+                    @if(old('contents'))
+                        @foreach(old('contents') as $i => $c)
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Content Title</label>
+                                <input type="text" name="contents[{{ $i }}][title]" required
+                                       class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700" value="{{ $c['title'] ?? '' }}">
 
-                        <label for="content_type" class="block text-sm font-medium text-gray-700 mt-2 mb-1">Content Type</label>
-                        <select name="contents[0][type]" required
-                                class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">
-                            <option value="">Select Type</option>
-                            <option value="text">Text</option>
-                            <option value="video">Video</option>
-                            <option value="image">Image</option>
-                        </select>
+                                <label class="block text-sm font-medium text-gray-700 mt-2 mb-1">Content Type</label>
+                                <select name="contents[{{ $i }}][type]" required
+                                        class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">
+                                    <option value="">Select Type</option>
+                                    <option value="text" {{ (isset($c['type']) && $c['type'] == 'text') ? 'selected' : '' }}>Text</option>
+                                    <option value="video" {{ (isset($c['type']) && $c['type'] == 'video') ? 'selected' : '' }}>Video</option>
+                                    <option value="image" {{ (isset($c['type']) && $c['type'] == 'image') ? 'selected' : '' }}>Image</option>
+                                </select>
 
-                        <label for="content" class="block text-sm font-medium text-gray-700 mt-2 mb-1">Content</label>
-                        <textarea name="contents[0][content]" required
-                                  class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700"
-                                  placeholder="Enter text, video URL, or link here..."></textarea>
-                    </div>
+                                <label class="block text-sm font-medium text-gray-700 mt-2 mb-1">Content</label>
+                                <textarea name="contents[{{ $i }}][content]" required
+                                          class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">{{ $c['content'] ?? '' }}</textarea>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Content Title</label>
+                            <input type="text" name="contents[0][title]" required
+                                   class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700" placeholder="e.g., What is a variable?">
+
+                            <label class="block text-sm font-medium text-gray-700 mt-2 mb-1">Content Type</label>
+                            <select name="contents[0][type]" required
+                                    class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">
+                                <option value="">Select Type</option>
+                                <option value="text">Text</option>
+                                <option value="video">Video</option>
+                                <option value="image">Image</option>
+                            </select>
+
+                            <label class="block text-sm font-medium text-gray-700 mt-2 mb-1">Content</label>
+                            <textarea name="contents[0][content]" required
+                                      class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700"
+                                      placeholder="Enter text, video URL, or link here..."></textarea>
+                        </div>
+                    @endif
                 </div>
                 <button type="button" onclick="addContentField()" class="text-admin-primary text-sm hover:underline">
                     + Add Content
@@ -87,7 +115,21 @@
             <!-- Learning Outcomes -->
             <div>
                 <h2 class="text-lg font-semibold text-gray-800 mb-4">Learning Outcomes</h2>
-                <div id="outcomes-container"></div> <!-- Removed default input -->
+                <div id="outcomes-container">
+                    @if(old('learning_outcomes'))
+                        @foreach(old('learning_outcomes') as $i => $lo)
+                            <div class="flex items-center gap-2 mb-2">
+                                <input type="checkbox" class="h-4 w-4 text-admin-primary focus:ring-admin-primary border-gray-300 rounded">
+                                <input type="text" name="learning_outcomes[{{ $i }}][outcome]" required
+                                       class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700" value="{{ $lo['outcome'] ?? '' }}">
+                                <button type="button" class="text-red-600" onclick="this.parentElement.remove()">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        @endforeach
+                    @endif
+                </div>
+
                 <input type="text" id="new-outcome" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700 mt-2"
                        placeholder="Add a new learning outcome">
                 <button type="button" onclick="addLearningOutcome()" class="text-admin-primary text-sm hover:underline mt-2">
@@ -109,8 +151,8 @@
 </div>
 
 <script>
-    let contentIndex = 1;
-    let outcomeIndex = 0; // Start from 0 since no default input
+    let contentIndex = {{ count(old('contents', [])) ? count(old('contents', [])) : 1 }};
+    let outcomeIndex = {{ count(old('learning_outcomes', [])) }};
 
     function addContentField() {
         const container = document.getElementById('contents-container');

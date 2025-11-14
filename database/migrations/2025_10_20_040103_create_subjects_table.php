@@ -18,10 +18,18 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->timestamps();
         });
+        Schema::table('subjects', function (Blueprint $table) {
+            $table->foreignId('parent_subject_id')->nullable()->constrained('subjects')->nullOnDelete()->after('subject_code');
+            $table->boolean('is_subsubject')->default(false)->after('parent_subject_id');
+        });
     }
 
     public function down(): void
     {
+        Schema::table('subjects', function (Blueprint $table) {
+            $table->dropForeign(['parent_subject_id']);
+            $table->dropColumn(['parent_subject_id', 'is_subsubject']);
+        });
         Schema::dropIfExists('subjects');
     }
 };

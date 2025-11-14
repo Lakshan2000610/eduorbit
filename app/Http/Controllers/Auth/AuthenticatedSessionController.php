@@ -7,6 +7,8 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\StudentSubjectSelection;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
@@ -32,17 +34,34 @@ class AuthenticatedSessionController extends Controller
         // ✅ Get the logged-in user
         $user = Auth::user();
 
-        // ✅ Role-based redirect with fallback
-        if ($user->role === 'admin') {
-            return redirect()->route('admin.dashboard');
-        } elseif ($user->role === 'teacher') {
-            return redirect()->route('teacher.dashboard');
-        } elseif ($user->role === 'student') {
+        // If student role, redirect to selection page when no current selections
+        if ($user->role === 'student') {
+            $hasCurrent = StudentSubjectSelection::where('student_id', $user->id)
+                ->where('is_current', true)
+                ->exists();
+
+            if (! $hasCurrent) {
+                return redirect()->route('student.select-subjects');
+            }
+
             return redirect()->route('student.dashboard');
         }
 
-        // Fallback to welcome page if role is unexpected (shouldn’t happen due to validation)
-        return redirect('/');
+        // If teacher role, go to teacher dashboard when available
+        if ($user->role === 'teacher' && Route::has('teacher.dashboard')) {
+            return redirect()->intended(route('teacher.dashboard'));
+        }
+
+        // fallback for other roles:
+        // Prefer role-specific dashboard routes when available, otherwise fall back to home '/'
+        $fallback = url('/');
+        if ($user && $user->role === 'admin' && Route::has('admin.dashboard')) {
+            $fallback = route('admin.dashboard');
+        } elseif (Route::has('dashboard')) {
+            $fallback = route('dashboard');
+        }
+
+        return redirect()->intended($fallback);
     }
 
     /**
