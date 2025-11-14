@@ -1,8 +1,6 @@
 
-// ...existing code...
-@php
-    // existing helpers / variables
-@endphp
+
+
 
 @php
     // compute a dashboard URL/name safely so views don't call undefined route('dashboard')

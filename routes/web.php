@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\RoadmapController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Teacher\DashboardController as TeacherDashboard;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
@@ -23,9 +24,10 @@ Route::middleware('auth')->group(function () {
 
 
 // ADMIN ROUTES
-Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['web','auth','role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
-    
+
+    // Roadmaps
     Route::get('/roadmaps', [RoadmapController::class, 'index'])->name('roadmaps.index');
     Route::get('/roadmaps/create', [RoadmapController::class, 'create'])->name('roadmaps.create');
     Route::post('/roadmaps', [RoadmapController::class, 'store'])->name('roadmaps.store');
@@ -79,6 +81,11 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
 
     // preview subjects (POST from grade form)
     Route::post('/select-subjects/preview', [SubjectSelectionController::class, 'previewSubjects'])->name('select-subjects.preview');
+
+    // Add safe GET that redirects back to the grade form (prevents 405 on direct GET)
+    Route::get('/select-subjects/preview', function () {
+        return redirect()->route('student.select-subjects');
+    });
 
     // final store
     Route::post('/select-subjects', [SubjectSelectionController::class, 'storeSelection'])->name('store-subjects');
