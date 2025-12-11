@@ -6,13 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class LearningOutcome extends Model
 {
-    protected $fillable = [
-        'subtopic_id',
-        'outcome',
-        'difficulty_level',
-        // add other columns if present
-    ];
+    protected $fillable = ['subtopic_id', 'outcome', 'difficulty_level'];
 
-    // optional: cast difficulty_level or timestamps if needed
-    // protected $casts = ['difficulty_level' => 'string'];
+    public function subtopic()
+    {
+        return $this->belongsTo(Subtopic::class);
+    }
 }

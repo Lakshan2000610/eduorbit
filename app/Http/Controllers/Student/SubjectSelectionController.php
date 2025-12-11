@@ -118,7 +118,7 @@ class SubjectSelectionController extends Controller
         $grade = $selections->first()->grade ?? null;
         $language = $selections->first()->language ?? null;
 
-        return view('student.selected-subjects', compact('selections', 'grade', 'language'));
+        return view('student.selected-subjects-Roadmap', compact('selections', 'grade', 'language'));
     }
 
     // optional: history

@@ -15,6 +15,12 @@ return new class extends Migration
             $table->text('content'); // text or URL
             $table->timestamps();
         });
+
+        if (! Schema::hasColumn('resources', 'title')) {
+            Schema::table('resources', function (Blueprint $table) {
+                $table->string('title')->nullable()->after('content');
+            });
+        }
     }
 
     public function down(): void

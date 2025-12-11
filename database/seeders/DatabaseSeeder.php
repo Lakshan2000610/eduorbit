@@ -23,5 +23,7 @@ class DatabaseSeeder extends Seeder
 
         // ✅ Only call AdminUserSeeder
         $this->call(AdminUserSeeder::class);
+        $this->call(SriLankaCurriculumSeeder::class);
+        
     }
 }

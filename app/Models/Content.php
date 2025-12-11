@@ -10,4 +10,9 @@ class Content extends Model
     use HasFactory;
 
     protected $fillable = ['subtopic_id', 'title', 'type', 'content'];
+
+    public function subtopic()
+    {
+        return $this->belongsTo(Subtopic::class);
+    }
 }

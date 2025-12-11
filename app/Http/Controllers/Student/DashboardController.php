@@ -3,111 +3,60 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Subject;
 use App\Models\StudentSubjectSelection;
+use App\Models\Subject;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        $userId = Auth::id();
-
-        // if student doesn't have any current selections, send them to the selection page
-        $hasCurrent = StudentSubjectSelection::where('student_id', $userId)
-            ->where('is_current', true)
-            ->exists();
-
-        if (! $hasCurrent) {
-            return redirect()->route('student.select-subjects');
-        }
-
-        // otherwise show student dashboard
         return view('student.dashboard');
     }
-}
 
-class SubjectSelectionController extends Controller
-{
-    public function showSelectionForm(Request $request)
+    public function showProgress($subjectId)
     {
-        // optional: read grade/lang from query or student's profile
-        $grade = $request->query('grade', null);
-        $language = $request->query('language', null);
+        $user = Auth::user();
+        
+        $selection = StudentSubjectSelection::where('student_id', $user->id)
+            ->where('subject_id', $subjectId)
+            ->first();
 
-        // load mains for selects (you can pre-filter if grade+language present)
-        $mainSubjects = Subject::where(function($q){
-                $q->where('is_subsubject', false)->orWhereNull('is_subsubject');
-            })
-            ->when($grade, fn($q) => $q->where('grade', $grade))
-            ->when($language, fn($q) => $q->where('language', $language))
-            ->with('children') // subsubjects
-            ->orderBy('subject_name')
-            ->get();
+        if (!$selection) {
+            abort(403, 'You have not selected this subject.');
+        }
 
-        // user's current selections (if any)
-        $userId = Auth::id();
-        $current = StudentSubjectSelection::where('student_id', $userId)
-                    ->where('is_current', true)
-                    ->get()
-                    ->pluck('subject_id')
-                    ->toArray();
-
-        return view('student.select-subjects', compact('mainSubjects', 'grade', 'language', 'current'));
-    }
-
-    public function storeSelection(Request $request)
-    {
-        $request->validate([
-            'grade' => 'required|string',
-            'language' => 'required|string',
-            'subject_ids' => 'required|array|min:1',
-            'subject_ids.*' => 'required|integer|exists:subjects,id',
-        ]);
-
-        $userId = Auth::id();
-        $grade = $request->grade;
-        $language = $request->language;
-        $subjectIds = array_map('intval', $request->subject_ids);
-
-        DB::transaction(function() use ($userId, $grade, $language, $subjectIds) {
-            // mark previous selections for this student as not current
-            StudentSubjectSelection::where('student_id', $userId)
-                ->where('is_current', true)
-                ->update(['is_current' => false]);
-
-            // insert new selections as current
-            $now = now();
-            $rows = [];
-            foreach ($subjectIds as $sid) {
-                $rows[] = [
-                    'student_id' => $userId,
-                    'grade' => $grade,
-                    'language' => $language,
-                    'subject_id' => $sid,
-                    'is_current' => true,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
+        // Eager load topics with subtopics, contents, resources, and learning outcomes
+        $subject = Subject::with([
+            'topics' => function ($q) {
+                $q->with([
+                    'subtopics' => function ($sq) {
+                        $sq->with('contents', 'resources', 'learningOutcomes');
+                    }
+                ]);
             }
-            // bulk insert
-            StudentSubjectSelection::insert($rows);
-        });
+        ])->find($subjectId);
 
-        return redirect()->route('student.dashboard')->with('success', 'Subjects confirmed.');
-    }
+        // Calculate progress
+        $overallProgress = $selection->progress ?? 0;
+        $completedTopics = $selection->completed_topics ?? 0;
+        $totalTopics = $subject->topics->count();
 
-    // optional: return student's selections (history)
-    public function mySelections()
-    {
-        $userId = Auth::id();
-        $selections = StudentSubjectSelection::with('subject')
-            ->where('student_id', $userId)
-            ->orderByDesc('created_at')
-            ->get();
+        // Count total resources per subtopic for progress tracking
+        $resourceCounts = [];
+        foreach ($subject->topics as $topic) {
+            foreach ($topic->subtopics as $subtopic) {
+                $resourceCounts[$subtopic->id] = $subtopic->resources->count();
+            }
+        }
 
-        return view('student.my-selections', compact('selections'));
+        return view('student.progress', [
+            'subject' => $subject,
+            'overallProgress' => $overallProgress,
+            'completedTopics' => $completedTopics,
+            'totalTopics' => $totalTopics,
+            'subjectProgress' => collect(),
+            'resourceCounts' => $resourceCounts,
+        ]);
     }
 }

@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Subject;
 use App\Models\Topic;
-use App\Models\Subtopic;
-use App\Models\Resource as ResourceModel;
-use App\Models\LearningOutcome as LearningOutcomeModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use App\Models\Resource as ResourceModel;
+use App\Models\Subtopic;
+use App\Models\LearningOutcome as LearningOutcomeModel;
+use Illuminate\Support\Str;
 
 class RoadmapController extends Controller
 {
@@ -264,11 +266,10 @@ public function storeSubtopic(Request $request, $topicId)
         'subtopic_code' => 'required|string|max:50',
         'subtopic_name' => 'required|string|max:255',
         'description' => 'nullable|string',
+        // validate title for uploaded/resources arrays
         'contents.*.title' => 'nullable|string|max:255',
-        'contents.*.type' => 'nullable|in:text,video,image',
-        'contents.*.content' => 'nullable|string',
-        'learning_outcomes.*.outcome' => 'nullable|string',
-        'learning_outcomes.*.difficulty_level' => 'nullable|string|in:easy,medium,hard',
+        'resources.*.title' => 'nullable|string|max:255',
+        // file validation handled where needed
     ]);
 
     $topic = Topic::findOrFail($topicId);
@@ -280,39 +281,142 @@ public function storeSubtopic(Request $request, $topicId)
         'description' => $request->description,
     ]);
 
-    // Save contents/resources
-    if ($request->has('contents')) {
-        foreach ($request->contents as $c) {
-            if (!empty($c['type']) && !empty($c['content'])) {
-                ResourceModel::create([
-                    'resourceable_id' => $subtopic->id,
+    // Accept either contents[] (add form) or resources[] (edit form)
+    if ($request->has('contents') || $request->has('resources')) {
+        $inputArray = $request->input('contents') ?? $request->input('resources');
+
+        foreach ($inputArray as $i => $item) {
+            $type = $item['type'] ?? null;
+            $title = $item['title'] ?? null;
+            // coerce title to string or null
+            $title = is_string($title) ? trim($title) : null;
+
+            $textContent = $item['content'] ?? null;
+            $storedContent = $textContent;
+
+            if ($request->hasFile("contents.$i.file")) {
+                $file = $request->file("contents.$i.file");
+            } elseif ($request->hasFile("resources.$i.file")) {
+                $file = $request->file("resources.$i.file");
+            } else {
+                $file = null;
+            }
+
+            // If a file is uploaded, create resource first (to get id), then store file using resource id
+            if ($file) {
+                // create placeholder resource record to obtain id
+                $res = ResourceModel::create([
                     'resourceable_type' => Subtopic::class,
-                    'type' => $c['type'],
-                    'content' => $c['content'],
-                    'title' => $c['title'] ?? null,
+                    'resourceable_id' => $subtopic->id,
+                    'type' => $type,
+                    'content' => '', // will update after storing file
+                    'title' => $title,
+                ]);
+
+                $path = $this->storeUploadedFileForResource($file, $res, $subtopic);
+                $res->content = $path;
+                $res->save();
+            } else {
+                if ($type && $storedContent) {
+                    ResourceModel::create([
+                        'resourceable_type' => Subtopic::class,
+                        'resourceable_id' => $subtopic->id,
+                        'type' => $type,
+                        'content' => $storedContent,
+                        'title' => $title,
+                    ]);
+                }
+            }
+        }
+    }
+
+    // learning outcomes (if present)
+    if ($request->has('learning_outcomes')) {
+        foreach ($request->learning_outcomes as $lo) {
+            if (!empty($lo['outcome'])) {
+                LearningOutcomeModel::create([
+                    'subtopic_id' => $subtopic->id,
+                    'outcome' => $lo['outcome'],
+                    'difficulty_level' => $lo['difficulty_level'] ?? 'medium',
                 ]);
             }
         }
     }
 
-    // Save learning outcomes with default difficulty_level if not provided
-    if ($request->has('learning_outcomes')) {
-        foreach ($request->learning_outcomes as $lo) {
-            $outcomeText = trim($lo['outcome'] ?? '');
-            if ($outcomeText === '') {
-                continue; // skip empty
-            }
-            LearningOutcomeModel::create([
-                'subtopic_id' => $subtopic->id,
-                'outcome' => $outcomeText,
-                'difficulty_level' => $lo['difficulty_level'] ?? 'medium',
-            ]);
-        }
-    }
-
-    return redirect()->route('admin.roadmaps.manage-topics', $topic->id)
-                     ->with('success', 'Subtopic saved successfully.');
+    return redirect()->back()->with('success', 'Subtopic created.');
 }
+
+// Remove the duplicate method declaration
+// public function updateSubtopic(Request $request, $id)
+// {
+//     $request->validate([
+//         'subtopic_code' => 'required|string|max:50',
+//         'subtopic_name' => 'required|string|max:255',
+//         'description' => 'nullable|string',
+//     ]);
+//
+//     $subtopic = Subtopic::findOrFail($id);
+//
+//     $subtopic->update([
+//         'subtopic_code' => $request->subtopic_code,
+//         'subtopic_name' => $request->subtopic_name,
+//         'description' => $request->description,
+//     ]);
+//
+//     // Remove existing resources and recreate from submitted inputs
+//     $subtopic->resources()->delete();
+//
+//     if ($request->has('resources') || $request->has('contents')) {
+//         $inputArray = $request->input('resources') ?? $request->input('contents');
+//
+//         foreach ($inputArray as $i => $item) {
+//             $type = $item['type'] ?? null;
+//             $title = $item['title'] ?? null;
+//             $textContent = $item['content'] ?? null;
+//             $storedContent = $textContent;
+//
+//             if ($request->hasFile("resources.$i.file")) {
+//                 $file = $request->file("resources.$i.file");
+//             } elseif ($request->hasFile("contents.$i.file")) {
+//                 $file = $request->file("contents.$i.file");
+//             } else {
+//                 $file = null;
+//             }
+//
+//             if ($file) {
+//                 $file->validate(['file' => 'file|mimes:mp4,webm,ogg,jpg,jpeg,png,gif,webp|max:512000']);
+//                 $path = $file->store('resources', 'public');
+//                 $storedContent = $path;
+//             }
+//
+//             if ($type && $storedContent) {
+//                 ResourceModel::create([
+//                     'resourceable_type' => Subtopic::class,
+//                     'resourceable_id' => $subtopic->id,
+//                     'type' => $type,
+//                     'content' => $storedContent,
+//                     'title' => $title ?? null,
+//                 ]);
+//             }
+//         }
+//     }
+//
+//     // Replace learning outcomes
+//     $subtopic->learningOutcomes()->delete();
+//     if ($request->has('learning_outcomes')) {
+//         foreach ($request->learning_outcomes as $lo) {
+//             if (!empty($lo['outcome'])) {
+//                 LearningOutcomeModel::create([
+//                     'subtopic_id' => $subtopic->id,
+//                     'outcome' => $lo['outcome'],
+//                     'difficulty_level' => $lo['difficulty_level'] ?? 'medium',
+//                 ]);
+//             }
+//         }
+//     }
+//
+//     return redirect()->back()->with('success', 'Subtopic updated.');
+// }
 
     public function view($grade, $language)
     {
@@ -417,6 +521,7 @@ public function storeSubtopic(Request $request, $topicId)
             'description' => 'nullable|string',
             'resources.*.type' => 'nullable|in:text,video,image',
             'resources.*.content' => 'nullable|string',
+            'resources.*.file' => 'nullable|file|mimes:mp4,webm,ogg,jpg,jpeg,png,gif,webp|max:512000', // <-- allow files
             'learning_outcomes.*.outcome' => 'nullable|string',
             'learning_outcomes.*.difficulty_level' => 'nullable|in:easy,medium,hard',
         ]);
@@ -432,20 +537,45 @@ public function storeSubtopic(Request $request, $topicId)
         // Replace resources
         $subtopic->resources()->delete();
         if ($request->has('resources')) {
-            foreach ($request->resources as $r) {
-                if (!empty($r['type']) && !empty($r['content'])) {
-                    ResourceModel::create([
+            foreach ($request->resources as $i => $r) {
+                $type = $r['type'] ?? null;
+                $title = $r['title'] ?? null;
+                $content = $r['content'] ?? null;
+
+                if ($request->hasFile("resources.$i.file")) {
+                    $file = $request->file("resources.$i.file");
+                } else {
+                    $file = null;
+                }
+
+                if ($file) {
+                    // create placeholder resource row to get id
+                    $res = ResourceModel::create([
                         'resourceable_id' => $subtopic->id,
                         'resourceable_type' => Subtopic::class,
-                        'type' => $r['type'],
-                        'content' => $r['content'],
-                        'title' => $r['title'] ?? null,
+                        'type' => $type,
+                        'content' => '',
+                        'title' => $title ?? null,
                     ]);
+
+                    $path = $this->storeUploadedFileForResource($file, $res, $subtopic);
+                    $res->content = $path;
+                    $res->save();
+                } else {
+                    if (!empty($type) && !empty($content)) {
+                        ResourceModel::create([
+                            'resourceable_id' => $subtopic->id,
+                            'resourceable_type' => Subtopic::class,
+                            'type' => $type,
+                            'content' => $content,
+                            'title' => $title ?? null,
+                        ]);
+                    }
                 }
             }
         }
 
-        // Replace learning outcomes
+        // Replace learning outcomes (unchanged)
         $subtopic->learningOutcomes()->delete();
         if ($request->has('learning_outcomes')) {
             foreach ($request->learning_outcomes as $lo) {
@@ -523,5 +653,60 @@ public function storeSubtopic(Request $request, $topicId)
         $topic->delete();
 
         return redirect()->route('admin.roadmaps.manage-topics', $topic->subject_id)->with('success', 'Topic and its subtopics deleted.');
+    }
+
+    /**
+     * Store uploaded file under public disk with folder structure:
+     *   resources/{grade-slug}/{subject-code-slug}/topic-{n}/subtopic-{m}/{resourceId}.{ext}
+     * Returns storage-relative path (e.g. resources/grade-1/math/topic-1/subtopic-1/123.mp4)
+     */
+    private function storeUploadedFileForResource($file, ResourceModel $resource, Subtopic $subtopic)
+    {
+        // load only topic to avoid RelationNotFoundException when Topic lacks custom relations
+        $subtopic->loadMissing('topic');
+        $topic = $subtopic->topic ?? null;
+        $subject = null;
+
+        // try safe ways to get subject
+        if ($topic) {
+            if (method_exists($topic, 'subject')) {
+                try {
+                    $subject = $topic->subject;
+                } catch (\Throwable $e) {
+                    $subject = null;
+                }
+            }
+            if (! $subject && isset($topic->subject_id)) {
+                $subject = \App\Models\Subject::find($topic->subject_id);
+            }
+        }
+
+        // fallbacks and slugs
+        $gradeSlug = \Illuminate\Support\Str::slug($subject->grade ?? 'grade-unknown');
+        $subjectCodeBase = $subject->subject_code ?? ($subject->subject_name ?? 'subject');
+        $subjectSlug = \Illuminate\Support\Str::slug(explode('-G', $subjectCodeBase)[0]);
+
+        if (isset($topic->topic_code) && preg_match('/-T(\d+)/i', $topic->topic_code, $m)) {
+            $topicNum = $m[1];
+        } else {
+            $topicNum = $topic->id ?? 'topic';
+        }
+
+        if (isset($subtopic->subtopic_code) && preg_match('/-S(\d+)/i', $subtopic->subtopic_code, $m2)) {
+            $subNum = $m2[1];
+        } else {
+            $subNum = $subtopic->id ?? 'subtopic';
+        }
+
+        $dir = "resources/{$gradeSlug}/{$subjectSlug}/topic-{$topicNum}/subtopic-{$subNum}";
+
+        // ensure directory exists and store file
+        \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($dir);
+
+        $ext = $file->getClientOriginalExtension() ?: $file->extension();
+        $filename = $resource->id . '.' . $ext;
+        $storedPath = $file->storeAs($dir, $filename, 'public');
+
+        return $storedPath;
     }
 }

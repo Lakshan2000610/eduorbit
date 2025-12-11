@@ -7,12 +7,15 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Teacher\DashboardController as TeacherDashboard;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\SubjectSelectionController;
+use App\Http\Controllers\Student\SubjectProgressController;
+use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\TeacherController;
 
 require __DIR__.'/auth.php';
 
 Route::get('/', function () {
     return view('welcome');
-});
+})->name('welcome'); // Laravel will now understand route('welcome')
 
 // REMOVED: Route::get('/dashboard', function () { ... })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -95,4 +98,14 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
 
     // optional: history
     Route::get('/my-selections', [SubjectSelectionController::class, 'mySelections'])->name('my-selections');
+
+    // Add this new route for progress page
+    Route::get('/progress/{subjectId}', [StudentDashboardController::class, 'showProgress'])->name('progress');
+
+    // Progress update routes (MOVED HERE)
+    Route::post('/subjects/{subject}/progress', [SubjectProgressController::class, 'update'])
+        ->name('subject.progress.update');
+    
+    Route::post('/resource/{resource}/mark-complete', [SubjectProgressController::class, 'markResourceComplete'])
+        ->name('resource.mark-complete');
 });

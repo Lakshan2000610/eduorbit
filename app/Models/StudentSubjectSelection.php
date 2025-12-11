@@ -14,6 +14,8 @@ class StudentSubjectSelection extends Model
         'language',
         'subject_id',
         'is_current',
+        'progress',
+        'completed_topics',
     ];
 
     public function student()

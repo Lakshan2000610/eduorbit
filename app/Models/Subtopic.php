@@ -6,19 +6,24 @@ use Illuminate\Database\Eloquent\Model;
 
 class Subtopic extends Model
 {
-    protected $fillable = [
-        'topic_id',
-        'subtopic_code',
-        'subtopic_name',
-        'description',
-    ];
+    protected $fillable = ['topic_id', 'subtopic_code', 'subtopic_name', 'description'];
+
+    public function topic()
+    {
+        return $this->belongsTo(Topic::class);
+    }
+
+    public function contents()
+    {
+        return $this->hasMany(Content::class);
+    }
 
     /**
      * Polymorphic resources (Resource model uses resourceable_type/resourceable_id)
      */
     public function resources()
     {
-        return $this->morphMany(\App\Models\Resource::class, 'resourceable');
+        return $this->morphMany(Resource::class, 'resourceable');
     }
 
     /**
@@ -26,6 +31,6 @@ class Subtopic extends Model
      */
     public function learningOutcomes()
     {
-        return $this->hasMany(\App\Models\LearningOutcome::class, 'subtopic_id');
+        return $this->hasMany(LearningOutcome::class);
     }
 }

@@ -1,4 +1,3 @@
-
 @extends('layouts.admin')
 
 @section('content')
@@ -9,7 +8,7 @@
     </div>
 
     <div class="bg-white rounded-xl p-6">
-        <form action="{{ route('admin.roadmaps.update-subtopic', $subtopic->id) }}" method="POST" class="space-y-6">
+        <form action="{{ route('admin.roadmaps.update-subtopic', $subtopic->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
             @csrf
 
             <div>
@@ -27,23 +26,58 @@
                 <textarea name="description" class="w-full px-3 py-2 border rounded-lg">{{ old('description', $subtopic->description) }}</textarea>
             </div>
 
-            <!-- For brevity: simple resources and outcomes lists (replace-on-save) -->
+            <!-- For brevity: resources and outcomes lists (replace-on-save) -->
             <div>
                 <h3 class="font-semibold mb-2">Resources</h3>
                 <div id="resources-container">
                     @foreach($subtopic->resources as $i => $r)
-                        <div class="flex gap-2 mb-2">
-                            <select name="resources[{{ $i }}][type]" class="w-1/3 px-2 py-1 border rounded">
-                                <option value="text" {{ $r->type === 'text' ? 'selected' : '' }}>Text</option>
-                                <option value="video" {{ $r->type === 'video' ? 'selected' : '' }}>Video</option>
-                                <option value="image" {{ $r->type === 'image' ? 'selected' : '' }}>Image</option>
-                            </select>
-                            <input type="text" name="resources[{{ $i }}][content]" value="{{ $r->content }}" class="w-2/3 px-2 py-1 border rounded" />
+                        <div class="resource-item mb-4 p-3 border rounded-lg bg-gray-50" data-index="{{ $i }}">
+                            <input type="hidden" name="resources[{{ $i }}][id]" value="{{ $r->id }}">
+                            <div class="flex gap-2 mb-2 items-center">
+                                <select name="resources[{{ $i }}][type]" class="w-1/4 px-2 py-1 border rounded resource-type-select" onchange="updateResourceField(this)">
+                                    <option value="text" {{ $r->type === 'text' ? 'selected' : '' }}>Text</option>
+                                    <option value="video" {{ $r->type === 'video' ? 'selected' : '' }}>Video</option>
+                                    <option value="image" {{ $r->type === 'image' ? 'selected' : '' }}>Image</option>
+                                </select>
+
+                                <input type="text" name="resources[{{ $i }}][title]" value="{{ old("resources.$i.title", $r->title ?? '') }}" placeholder="Title (optional)" class="flex-1 px-2 py-1 border rounded" />
+                                <button type="button" class="text-red-600 hover:text-red-800" onclick="this.closest('.resource-item').remove()">Remove</button>
+                            </div>
+
+                            <!-- Content areas -->
+                            <div class="resource-fields">
+                                <!-- Text -->
+                                <textarea name="resources[{{ $i }}][content]" class="resource-textarea w-full px-2 py-2 border rounded mb-2" style="display: {{ $r->type === 'text' ? 'block' : 'none' }};">{{ old("resources.$i.content", $r->content) }}</textarea>
+
+                                <!-- File input (shared name resources[i][file]) -->
+                                <div class="file-inputs" style="display: {{ $r->type === 'text' ? 'none' : 'block' }};">
+                                    <input type="file" name="resources[{{ $i }}][file]" accept="video/*,image/*" class="resource-file-input block w-full mb-1" />
+                                    <small class="text-gray-500 block mb-2">
+                                        @if($r->type === 'video') Supported: MP4, WebM, OGG (Max 500MB)
+                                        @elseif($r->type === 'image') Supported: JPG, PNG, GIF, WEBP (Max 10MB)
+                                        @endif
+                                    </small>
+
+                                    <div class="existing-preview">
+                                        @if($r->type === 'video' && $r->content)
+                                            <video controls class="w-full rounded max-h-64 bg-black">
+                                                <source src="{{ asset('storage/' . $r->content) }}">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        @elseif($r->type === 'image' && $r->content)
+                                            <img src="{{ asset('storage/' . $r->content) }}" alt="preview" class="w-full rounded max-h-48 object-contain bg-gray-100" />
+                                        @elseif($r->type !== 'text' && $r->content)
+                                            <div class="text-sm text-gray-600 break-words">{{ $r->content }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     @endforeach
+
                     <div id="new-resources"></div>
                 </div>
-                <button type="button" onclick="addResourceEdit()" class="text-admin-primary text-sm">+ Add resource</button>
+                <button type="button" onclick="addResourceEdit()" class="text-admin-primary text-sm mt-2">+ Add resource</button>
             </div>
 
             <div>
@@ -61,7 +95,7 @@
                     @endforeach
                     <div id="new-outcomes"></div>
                 </div>
-                <button type="button" onclick="addOutcomeEdit()" class="text-admin-primary text-sm">+ Add outcome</button>
+                <button type="button" onclick="addOutcomeEdit()" class="text-admin-primary text-sm mt-2">+ Add outcome</button>
             </div>
 
             <div class="flex justify-end">
@@ -73,14 +107,50 @@
 
 <script>
     let resIndex = {{ $subtopic->resources->count() }};
+    function updateResourceField(select){
+        const container = select.closest('.resource-item');
+        const type = select.value;
+        const textarea = container.querySelector('.resource-textarea');
+        const fileInputs = container.querySelector('.file-inputs');
+        const preview = container.querySelector('.existing-preview');
+
+        if(type === 'text'){
+            if(textarea) textarea.style.display = 'block';
+            if(fileInputs) fileInputs.style.display = 'none';
+        } else {
+            if(textarea) textarea.style.display = 'none';
+            if(fileInputs) fileInputs.style.display = 'block';
+        }
+        // update small helper text based on type
+        if(fileInputs){
+            const small = fileInputs.querySelector('small');
+            if(small){
+                small.textContent = type === 'video' ? 'Supported: MP4, WebM, OGG (Max 500MB)' : 'Supported: JPG, PNG, GIF, WEBP (Max 10MB)';
+            }
+        }
+    }
+
     function addResourceEdit(){
         const container = document.getElementById('new-resources');
         const idx = resIndex++;
-        const html = `<div class="flex gap-2 mb-2">
-            <select name="resources[${idx}][type]" class="w-1/3 px-2 py-1 border rounded">
-                <option value="text">Text</option><option value="video">Video</option><option value="image">Image</option>
-            </select>
-            <input type="text" name="resources[${idx}][content]" class="w-2/3 px-2 py-1 border rounded" />
+        const html = `<div class="resource-item mb-4 p-3 border rounded-lg bg-gray-50" data-index="${idx}">
+            <div class="flex gap-2 mb-2 items-center">
+                <select name="resources[${idx}][type]" class="w-1/4 px-2 py-1 border rounded resource-type-select" onchange="updateResourceField(this)">
+                    <option value="text">Text</option>
+                    <option value="video">Video</option>
+                    <option value="image">Image</option>
+                </select>
+                <input type="text" name="resources[${idx}][title]" placeholder="Title (optional)" class="flex-1 px-2 py-1 border rounded" />
+                <button type="button" class="text-red-600 hover:text-red-800" onclick="this.closest('.resource-item').remove()">Remove</button>
+            </div>
+            <div class="resource-fields">
+                <textarea name="resources[${idx}][content]" class="resource-textarea w-full px-2 py-2 border rounded mb-2" style="display:block;" placeholder="Enter text content"></textarea>
+                <div class="file-inputs" style="display:none;">
+                    <input type="file" name="resources[${idx}][file]" accept="video/*,image/*" class="resource-file-input block w-full mb-1" />
+                    <small class="text-gray-500 block mb-2">Select file</small>
+                    <div class="existing-preview"></div>
+                </div>
+            </div>
         </div>`;
         container.insertAdjacentHTML('beforeend', html);
     }
@@ -95,5 +165,30 @@
             </select></div>`;
         container.insertAdjacentHTML('beforeend', html);
     }
+
+    // initialize existing selects on load
+    document.querySelectorAll('.resource-type-select').forEach(select => {
+        updateResourceField(select);
+        // attach change listener for file preview
+        const container = select.closest('.resource-item');
+        const fileInput = container ? container.querySelector('.resource-file-input') : null;
+        if(fileInput){
+            fileInput.addEventListener('change', function(e){
+                const file = this.files[0];
+                const previewEl = container.querySelector('.existing-preview');
+                if(!file || !previewEl) return;
+                const url = URL.createObjectURL(file);
+                // clear
+                previewEl.innerHTML = '';
+                if(file.type.startsWith('image/')){
+                    previewEl.innerHTML = `<img src="${url}" class="w-full rounded max-h-48 object-contain bg-gray-100" />`;
+                } else if(file.type.startsWith('video/')){
+                    previewEl.innerHTML = `<video controls class="w-full rounded max-h-64 bg-black"><source src="${url}"></video>`;
+                } else {
+                    previewEl.textContent = file.name;
+                }
+            });
+        }
+    });
 </script>
 @endsection
