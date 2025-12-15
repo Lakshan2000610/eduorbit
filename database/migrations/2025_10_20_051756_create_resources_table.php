@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->morphs('resourceable'); // for polymorphic relation to Subject or Topic
             $table->string('type'); // text, video, image
-            $table->text('content'); // text or URL
+            $table->text('content'); // only text 
             $table->timestamps();
         });
 
@@ -21,6 +21,10 @@ return new class extends Migration
                 $table->string('title')->nullable()->after('content');
             });
         }
+
+        Schema::table('resources', function (Blueprint $table) {
+            $table->string('url')->nullable()->after('content');
+        });
     }
 
     public function down(): void

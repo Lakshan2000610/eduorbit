@@ -59,15 +59,15 @@
                                     </small>
 
                                     <div class="existing-preview">
-                                        @if($r->type === 'video' && $r->content)
+                                        @if($r->type === 'video' && $r->url)
                                             <video controls class="w-full rounded max-h-64 bg-black">
-                                                <source src="{{ asset('storage/' . $r->content) }}">
+                                                <source src="{{ asset('storage/' . $r->url) }}">
                                                 Your browser does not support the video tag.
                                             </video>
-                                        @elseif($r->type === 'image' && $r->content)
-                                            <img src="{{ asset('storage/' . $r->content) }}" alt="preview" class="w-full rounded max-h-48 object-contain bg-gray-100" />
-                                        @elseif($r->type !== 'text' && $r->content)
-                                            <div class="text-sm text-gray-600 break-words">{{ $r->content }}</div>
+                                        @elseif($r->type === 'image' && $r->url)
+                                            <img src="{{ asset('storage/' . $r->url) }}" alt="preview" class="w-full rounded max-h-48 object-contain bg-gray-100" />
+                                        @elseif($r->type !== 'text' && $r->url)
+                                            <div class="text-sm text-gray-600 break-words">{{ $r->url }}</div>
                                         @endif
                                     </div>
                                 </div>

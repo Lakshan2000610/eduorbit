@@ -309,18 +309,18 @@ public function storeSubtopic(Request $request, $topicId)
                     'resourceable_type' => Subtopic::class,
                     'resourceable_id' => $subtopic->id,
                     'type' => $type,
-                    'content' => '', // will update after storing file
-                    'title' => $title,
+                    'url' => '',  // Use 'url' for files
+                    'title' => $title ?? null,
                 ]);
 
                 $path = $this->storeUploadedFileForResource($file, $res, $subtopic);
-                $res->content = $path;
+                $res->url = $path;  // Store path in 'url'
                 $res->save();
             } else {
-                if ($type && $storedContent) {
+                if (!empty($type) && !empty($storedContent)) {
                     ResourceModel::create([
-                        'resourceable_type' => Subtopic::class,
                         'resourceable_id' => $subtopic->id,
+                        'resourceable_type' => Subtopic::class,
                         'type' => $type,
                         'content' => $storedContent,
                         'title' => $title,
@@ -346,77 +346,6 @@ public function storeSubtopic(Request $request, $topicId)
     return redirect()->back()->with('success', 'Subtopic created.');
 }
 
-// Remove the duplicate method declaration
-// public function updateSubtopic(Request $request, $id)
-// {
-//     $request->validate([
-//         'subtopic_code' => 'required|string|max:50',
-//         'subtopic_name' => 'required|string|max:255',
-//         'description' => 'nullable|string',
-//     ]);
-//
-//     $subtopic = Subtopic::findOrFail($id);
-//
-//     $subtopic->update([
-//         'subtopic_code' => $request->subtopic_code,
-//         'subtopic_name' => $request->subtopic_name,
-//         'description' => $request->description,
-//     ]);
-//
-//     // Remove existing resources and recreate from submitted inputs
-//     $subtopic->resources()->delete();
-//
-//     if ($request->has('resources') || $request->has('contents')) {
-//         $inputArray = $request->input('resources') ?? $request->input('contents');
-//
-//         foreach ($inputArray as $i => $item) {
-//             $type = $item['type'] ?? null;
-//             $title = $item['title'] ?? null;
-//             $textContent = $item['content'] ?? null;
-//             $storedContent = $textContent;
-//
-//             if ($request->hasFile("resources.$i.file")) {
-//                 $file = $request->file("resources.$i.file");
-//             } elseif ($request->hasFile("contents.$i.file")) {
-//                 $file = $request->file("contents.$i.file");
-//             } else {
-//                 $file = null;
-//             }
-//
-//             if ($file) {
-//                 $file->validate(['file' => 'file|mimes:mp4,webm,ogg,jpg,jpeg,png,gif,webp|max:512000']);
-//                 $path = $file->store('resources', 'public');
-//                 $storedContent = $path;
-//             }
-//
-//             if ($type && $storedContent) {
-//                 ResourceModel::create([
-//                     'resourceable_type' => Subtopic::class,
-//                     'resourceable_id' => $subtopic->id,
-//                     'type' => $type,
-//                     'content' => $storedContent,
-//                     'title' => $title ?? null,
-//                 ]);
-//             }
-//         }
-//     }
-//
-//     // Replace learning outcomes
-//     $subtopic->learningOutcomes()->delete();
-//     if ($request->has('learning_outcomes')) {
-//         foreach ($request->learning_outcomes as $lo) {
-//             if (!empty($lo['outcome'])) {
-//                 LearningOutcomeModel::create([
-//                     'subtopic_id' => $subtopic->id,
-//                     'outcome' => $lo['outcome'],
-//                     'difficulty_level' => $lo['difficulty_level'] ?? 'medium',
-//                 ]);
-//             }
-//         }
-//     }
-//
-//     return redirect()->back()->with('success', 'Subtopic updated.');
-// }
 
     public function view($grade, $language)
     {
@@ -534,45 +463,66 @@ public function storeSubtopic(Request $request, $topicId)
             'description' => $request->description,
         ]);
 
-        // Replace resources
-        $subtopic->resources()->delete();
+        // Handle resources: update existing, create new, delete removed
         if ($request->has('resources')) {
+            $submittedIds = collect($request->resources)->pluck('id')->filter()->toArray();
+
             foreach ($request->resources as $i => $r) {
                 $type = $r['type'] ?? null;
                 $title = $r['title'] ?? null;
                 $content = $r['content'] ?? null;
+                $existingId = $r['id'] ?? null;
 
-                if ($request->hasFile("resources.$i.file")) {
-                    $file = $request->file("resources.$i.file");
+                if ($existingId) {
+                    // Update existing resource
+                    $res = ResourceModel::find($existingId);
+                    if ($res) {
+                        if ($request->hasFile("resources.$i.file")) {
+                            $file = $request->file("resources.$i.file");
+                            $path = $this->storeUploadedFileForResource($file, $res, $subtopic);
+                            $res->url = $path;
+                            $res->content = '';  // Clear content for files
+                        }
+                        // Update other fields
+                        $res->type = $type;
+                        $res->title = $title;
+                        if ($type === 'text' && !empty($content)) {
+                            $res->content = $content;
+                            $res->url = null;  // Clear URL for text
+                        }
+                        $res->save();
+                    }
                 } else {
-                    $file = null;
-                }
-
-                if ($file) {
-                    // create placeholder resource row to get id
-                    $res = ResourceModel::create([
-                        'resourceable_id' => $subtopic->id,
-                        'resourceable_type' => Subtopic::class,
-                        'type' => $type,
-                        'content' => '',
-                        'title' => $title ?? null,
-                    ]);
-
-                    $path = $this->storeUploadedFileForResource($file, $res, $subtopic);
-                    $res->content = $path;
-                    $res->save();
-                } else {
-                    if (!empty($type) && !empty($content)) {
+                    // Create new resource
+                    if ($request->hasFile("resources.$i.file")) {
+                        $file = $request->file("resources.$i.file");
+                        $res = ResourceModel::create([
+                            'resourceable_id' => $subtopic->id,
+                            'resourceable_type' => Subtopic::class,
+                            'type' => $type,
+                            'url' => '',
+                            'title' => $title,
+                        ]);
+                        $path = $this->storeUploadedFileForResource($file, $res, $subtopic);
+                        $res->url = $path;
+                        $res->save();
+                    } elseif (!empty($type) && !empty($content)) {
                         ResourceModel::create([
                             'resourceable_id' => $subtopic->id,
                             'resourceable_type' => Subtopic::class,
                             'type' => $type,
                             'content' => $content,
-                            'title' => $title ?? null,
+                            'title' => $title,
                         ]);
                     }
                 }
             }
+
+            // Delete resources not in the submitted list
+            $subtopic->resources()->whereNotIn('id', $submittedIds)->delete();
+        } else {
+            // If no resources submitted, delete all
+            $subtopic->resources()->delete();
         }
 
         // Replace learning outcomes (unchanged)

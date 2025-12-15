@@ -21,6 +21,7 @@
                     'id' => $r->id,
                     'type' => $r->type,
                     'content' => $r->content ?? '',
+                    'url' => $r->url ?? '',
                     'title' => $r->title ?? ( $r->type ? ucfirst($r->type).' Resource' : 'Resource' ), // added title
                 ];
             }
@@ -181,26 +182,26 @@
                                                             </div>
                                                         @elseif($resource->type === 'video')
                                                             <div class="mt-2">
-                                                                @if(is_string($resource->content) && Str::endsWith($resource->content, ['.mp4', '.webm', '.ogg']))
+                                                                @if(is_string($resource->url) && Str::endsWith($resource->url, ['.mp4', '.webm', '.ogg']))
                                                                     <video class="w-full rounded-lg bg-black max-h-64" controls>
-                                                                        <source src="{{ asset('storage/' . $resource->content) }}" type="video/mp4">
+                                                                        <source src="{{ asset('storage/app/public/' . $resource->url) }}" type="video/mp4">
                                                                         Your browser does not support the video tag.
                                                                     </video>
                                                                 @else
                                                                     <div class="text-sm text-gray-600 bg-gray-100 p-3 rounded">
                                                                         <p><strong>Video URL:</strong></p>
-                                                                        <a href="{{ is_string($resource->content) ? $resource->content : '#' }}" target="_blank" class="text-blue-600 hover:underline break-all">{{ is_string($resource->content) ? $resource->content : 'Invalid resource' }}</a>
+                                                                        <a href="{{ is_string($resource->url) ? $resource->url : '#' }}" target="_blank" class="text-blue-600 hover:underline break-all">{{ is_string($resource->url) ? $resource->url : 'Invalid resource' }}</a>
                                                                     </div>
                                                                 @endif
                                                             </div>
                                                         @elseif($resource->type === 'image')
                                                             <div class="mt-2">
-                                                                @if(is_string($resource->content) && Str::endsWith($resource->content, ['.jpg', '.jpeg', '.png', '.gif', '.webp']))
-                                                                    <img src="{{ asset('storage/' . $resource->content) }}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100">
+                                                                @if(is_string($resource->url) && Str::endsWith($resource->url, ['.jpg', '.jpeg', '.png', '.gif', '.webp']))
+                                                                    <img src="{{ asset('storage/app/public/' . $resource->url) }}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100">
                                                                 @else
                                                                     <div class="text-sm text-gray-600 bg-gray-100 p-3 rounded">
                                                                         <p><strong>Image URL:</strong></p>
-                                                                        <a href="{{ is_string($resource->content) ? $resource->content : '#' }}" target="_blank" class="text-blue-600 hover:underline break-all">{{ is_string($resource->content) ? $resource->content : 'Invalid resource' }}</a>
+                                                                        <a href="{{ is_string($resource->url) ? $resource->url : '#' }}" target="_blank" class="text-blue-600 hover:underline break-all">{{ is_string($resource->url) ? $resource->url : 'Invalid resource' }}</a>
                                                                     </div>
                                                                 @endif
                                                             </div>
@@ -279,16 +280,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (resource.type === 'text') {
             html += `<div class="text-sm text-gray-700 bg-gray-50 p-3 rounded border-l-4 border-green-500">${resource.content}</div>`;
         } else if (resource.type === 'video') {
-            if (typeof resource.content === 'string' && (resource.content.endsWith('.mp4') || resource.content.endsWith('.webm') || resource.content.endsWith('.ogg'))) {
-                html += `<div class="mt-2"><video class="w-full rounded-lg bg-black max-h-64" controls><source src="/storage/${resource.content}" type="video/mp4">Your browser does not support the video tag.</video></div>`;
+            if (typeof resource.url === 'string' && (resource.url.endsWith('.mp4') || resource.url.endsWith('.webm') || resource.url.endsWith('.ogg'))) {
+                html += `<div class="mt-2"><video class="w-full rounded-lg bg-black max-h-64" controls><source src="/storage/app/public/${resource.url}" type="video/mp4">Your browser does not support the video tag.</video></div>`;
             } else {
-                html += `<div class="mt-2 text-sm text-gray-600 bg-gray-100 p-3 rounded"><p><strong>Video URL:</strong></p><a href="${resource.content}" target="_blank" class="text-blue-600 hover:underline break-all">${resource.content}</a></div>`;
+                html += `<div class="mt-2 text-sm text-gray-600 bg-gray-100 p-3 rounded"><p><strong>Video URL:</strong></p><a href="${resource.url}" target="_blank" class="text-blue-600 hover:underline break-all">${resource.url}</a></div>`;
             }
         } else if (resource.type === 'image') {
-            if (typeof resource.content === 'string' && (resource.content.endsWith('.jpg') || resource.content.endsWith('.jpeg') || resource.content.endsWith('.png') || resource.content.endsWith('.gif') || resource.content.endsWith('.webp'))) {
-                html += `<div class="mt-2"><img src="/storage/${resource.content}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100"></div>`;
+            if (typeof resource.url === 'string' && (resource.url.endsWith('.jpg') || resource.url.endsWith('.jpeg') || resource.url.endsWith('.png') || resource.url.endsWith('.gif') || resource.url.endsWith('.webp'))) {
+                html += `<div class="mt-2"><img src="/storage/app/public/${resource.url}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100"></div>`;
             } else {
-                html += `<div class="mt-2 text-sm text-gray-600 bg-gray-100 p-3 rounded"><p><strong>Image URL:</strong></p><a href="${resource.content}" target="_blank" class="text-blue-600 hover:underline break-all">${resource.content}</a></div>`;
+                html += `<div class="mt-2 text-sm text-gray-600 bg-gray-100 p-3 rounded"><p><strong>Image URL:</strong></p><a href="${resource.url}" target="_blank" class="text-blue-600 hover:underline break-all">${resource.url}</a></div>`;
             }
         }
 
