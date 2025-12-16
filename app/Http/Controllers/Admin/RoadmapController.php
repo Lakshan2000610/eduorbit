@@ -266,10 +266,10 @@ public function storeSubtopic(Request $request, $topicId)
         'subtopic_code' => 'required|string|max:50',
         'subtopic_name' => 'required|string|max:255',
         'description' => 'nullable|string',
-        // validate title for uploaded/resources arrays
         'contents.*.title' => 'nullable|string|max:255',
-        'resources.*.title' => 'nullable|string|max:255',
-        // file validation handled where needed
+        'contents.*.type' => 'required|in:text,video,image',  // Make type required
+        'contents.*.content' => 'required_if:contents.*.type,text|nullable|string',
+        'contents.*.file' => 'required_if:contents.*.type,==,video,image|nullable|file|mimetypes:video/mp4,video/webm,video/ogg,image/jpeg,image/png,image/gif,image/webp|max:512000',
     ]);
 
     $topic = Topic::findOrFail($topicId);
@@ -450,7 +450,7 @@ public function storeSubtopic(Request $request, $topicId)
             'description' => 'nullable|string',
             'resources.*.type' => 'nullable|in:text,video,image',
             'resources.*.content' => 'nullable|string',
-            'resources.*.file' => 'nullable|file|mimes:mp4,webm,ogg,jpg,jpeg,png,gif,webp|max:512000', // <-- allow files
+            'resources.*.file' => 'nullable|file|max:512000|mimetypes:video/mp4,video/webm,video/ogg,image/jpeg,image/png,image/gif,image/webp',
             'learning_outcomes.*.outcome' => 'nullable|string',
             'learning_outcomes.*.difficulty_level' => 'nullable|in:easy,medium,hard',
         ]);
@@ -653,7 +653,10 @@ public function storeSubtopic(Request $request, $topicId)
         // ensure directory exists and store file
         \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($dir);
 
-        $ext = $file->getClientOriginalExtension() ?: $file->extension();
+        $ext = '.' . $file->extension(); // Always use Laravel's MIME guess
+        if (empty($ext) || $ext === '.') {
+            $ext = '.' . $file->getClientOriginalExtension();
+        }
         $filename = $resource->id . '.' . $ext;
         $storedPath = $file->storeAs($dir, $filename, 'public');
 

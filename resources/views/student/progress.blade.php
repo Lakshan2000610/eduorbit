@@ -184,7 +184,7 @@
                                                             <div class="mt-2">
                                                                 @if(is_string($resource->url) && Str::endsWith($resource->url, ['.mp4', '.webm', '.ogg']))
                                                                     <video class="w-full rounded-lg bg-black max-h-64" controls>
-                                                                        <source src="{{ asset('storage/app/public/' . $resource->url) }}" type="video/mp4">
+                                                                        <source src="{{ asset('storage/' . $resource->url) }}" type="video/mp4">
                                                                         Your browser does not support the video tag.
                                                                     </video>
                                                                 @else
@@ -197,7 +197,7 @@
                                                         @elseif($resource->type === 'image')
                                                             <div class="mt-2">
                                                                 @if(is_string($resource->url) && Str::endsWith($resource->url, ['.jpg', '.jpeg', '.png', '.gif', '.webp']))
-                                                                    <img src="{{ asset('storage/app/public/' . $resource->url) }}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100">
+                                                                    <img src="{{ asset('storage/' . $resource->url) }}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100">
                                                                 @else
                                                                     <div class="text-sm text-gray-600 bg-gray-100 p-3 rounded">
                                                                         <p><strong>Image URL:</strong></p>
@@ -281,13 +281,13 @@ document.addEventListener('DOMContentLoaded', function () {
             html += `<div class="text-sm text-gray-700 bg-gray-50 p-3 rounded border-l-4 border-green-500">${resource.content}</div>`;
         } else if (resource.type === 'video') {
             if (typeof resource.url === 'string' && (resource.url.endsWith('.mp4') || resource.url.endsWith('.webm') || resource.url.endsWith('.ogg'))) {
-                html += `<div class="mt-2"><video class="w-full rounded-lg bg-black max-h-64" controls><source src="/storage/app/public/${resource.url}" type="video/mp4">Your browser does not support the video tag.</video></div>`;
+                html += `<div class="mt-2"><video class="w-full rounded-lg bg-black max-h-64" controls><source src="/storage/${resource.url}" type="video/mp4">Your browser does not support the video tag.</video></div>`;
             } else {
                 html += `<div class="mt-2 text-sm text-gray-600 bg-gray-100 p-3 rounded"><p><strong>Video URL:</strong></p><a href="${resource.url}" target="_blank" class="text-blue-600 hover:underline break-all">${resource.url}</a></div>`;
             }
         } else if (resource.type === 'image') {
             if (typeof resource.url === 'string' && (resource.url.endsWith('.jpg') || resource.url.endsWith('.jpeg') || resource.url.endsWith('.png') || resource.url.endsWith('.gif') || resource.url.endsWith('.webp'))) {
-                html += `<div class="mt-2"><img src="/storage/app/public/${resource.url}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100"></div>`;
+                html += `<div class="mt-2"><img src="/storage/${resource.url}" alt="Resource Image" class="w-full rounded-lg max-h-96 object-contain bg-gray-100"></div>`;
             } else {
                 html += `<div class="mt-2 text-sm text-gray-600 bg-gray-100 p-3 rounded"><p><strong>Image URL:</strong></p><a href="${resource.url}" target="_blank" class="text-blue-600 hover:underline break-all">${resource.url}</a></div>`;
             }
