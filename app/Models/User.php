@@ -46,4 +46,9 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function gigs()
+    {
+        return $this->hasMany(Gig::class, 'teacher_id');
+    }
 }

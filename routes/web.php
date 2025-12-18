@@ -4,12 +4,23 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\RoadmapController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
-use App\Http\Controllers\Teacher\DashboardController as TeacherDashboard;
+use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\TeacherController;
+
+
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\SubjectSelectionController;
 use App\Http\Controllers\Student\SubjectProgressController;
-use App\Http\Controllers\Admin\StudentController;
-use App\Http\Controllers\Admin\TeacherController;
+
+use App\Http\Controllers\Teacher\TeacherDashboard;
+use App\Http\Controllers\Teacher\GigController;
+use App\Http\Controllers\Teacher\RequestController;
+use App\Http\Controllers\Teacher\CalendarController;
+use App\Http\Controllers\Teacher\EarningsController;
+use App\Http\Controllers\Teacher\MessageController;
+use App\Http\Controllers\Teacher\NotificationController;
+use App\Http\Controllers\Teacher\SettingsController;
+use App\Http\Controllers\Teacher\TeacherStudentController;
 
 require __DIR__.'/auth.php';
 
@@ -70,9 +81,52 @@ Route::middleware(['web','auth','role:admin'])->prefix('admin')->name('admin.')-
 
 
 
+// routes/web.php or wherever you define your routes
+
+
 // TEACHER ROUTES
 Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
+
+    // Dashboard
     Route::get('/dashboard', [TeacherDashboard::class, 'index'])->name('dashboard');
+
+    // My Gigs
+    Route::get('/gigs', [GigController::class, 'index'])->name('gigs');
+    Route::get('/gigs/create', [GigController::class, 'create'])->name('gigs.create');
+    Route::post('/gigs', [GigController::class, 'store'])->name('gigs.store');
+    Route::get('/gigs/{gig}/edit', [GigController::class, 'edit'])->name('gigs.edit');
+    Route::put('/gigs/{gig}', [GigController::class, 'update'])->name('gigs.update');
+    Route::patch('/gigs/{gig}/status', [GigController::class, 'updateStatus'])->name('gigs.update-status');
+    
+    // AJAX Routes
+    Route::get('/gig-subjects', [GigController::class, 'getSubjects'])->name('gig-subjects');
+    Route::get('/gig-topics', [GigController::class, 'getTopics'])->name('gig-topics');
+    Route::get('/gig-subtopics', [GigController::class, 'getSubtopics'])->name('gig-subtopics');
+    // ... other routes ...
+    // Student Requests
+    Route::get('/requests', [RequestController::class, 'index'])->name('requests');
+
+    // My Students
+    Route::get('/students', [TeacherStudentController::class, 'index'])->name('students');
+
+    // Session Calendar
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+
+    // Earnings & Payments
+    Route::get('/earn', [EarningsController::class, 'index'])->name('earn');
+
+    // Messages
+    Route::get('/messages', [MessageController::class, 'index'])->name('messages');
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
+
+    // Teacher Profile
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
+
+    // Settings
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+
 });
 
 // STUDENT ROUTES
