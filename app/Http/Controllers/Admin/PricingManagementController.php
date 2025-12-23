@@ -1,54 +1,69 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
-
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 use App\Models\Subject;
 use App\Models\PlatformFee;
-use Illuminate\Http\Request;
 
 class PricingManagementController extends Controller
 {
     public function index()
     {
-        // Group subjects by grade
-        $grades = Subject::where('is_subsubject', false)
-            ->whereNull('parent_subject_id')
-            ->with(['topics.subtopics.pricing'])
-            ->orderBy('grade')
-            ->get()
-            ->groupBy('grade')
-            ->map(function ($subjects, $grade) {
-                return [
-                    'code' => 'G' . substr($grade, -2), // e.g., Grade 9 -> G9
-                    'name' => $grade,
-                    'subjects' => $subjects->map(function ($subject) {
-                        return [
-                            'code' => $subject->subject_code,
-                            'name' => $subject->subject_name,
-                            'topics' => $subject->topics->map(function ($topic) {
-                                return [
-                                    'code' => $topic->topic_code,
-                                    'name' => $topic->topic_name,
-                                    'subtopics' => $topic->subtopics->map(function ($subtopic) {
-                                        $pricing = $subtopic->pricing ?? (object)['min_price' => 0, 'max_price' => 0];
-                                        return [
-                                            'code' => $subtopic->subtopic_code,
-                                            'name' => $subtopic->subtopic_name,
-                                            'minPrice' => (float)$pricing->min_price,
-                                            'maxPrice' => (float)$pricing->max_price,
-                                            'status' => $subtopic->status ?? 'Active',
-                                        ];
-                                    })->toArray(),
-                                ];
-                            })->toArray(),
-                        ];
-                    })->toArray(),
+        $platformFee = PlatformFee::getCurrentFee();
+
+        // Fetch active main subjects (non-subsubjects), eager load hierarchy
+        $subjectsQuery = Subject::where('status', 'active')
+            ->where('is_subsubject', false)
+            ->with(['topics.subtopics.pricing']);
+
+        $subjectsByGrade = $subjectsQuery->get()->groupBy('grade');
+
+        // Build hierarchical data structure matching the frontend expectations
+        $grades = [];
+
+        foreach ($subjectsByGrade as $gradeCode => $gradeSubjects) {
+            $grade = [
+                'code' => $gradeCode,
+                'name' => 'Grade ' . $gradeCode, // Adjust naming logic as needed (e.g., map "9" to "Grade 9")
+                'subjects' => []
+            ];
+
+            foreach ($gradeSubjects as $subject) {
+                $subjectData = [
+                    'code' => $subject->subject_code,
+                    'name' => $subject->subject_name,
+                    'topics' => []
                 ];
-            })->values()->toArray();
 
-        $platformFee = PlatformFee::first()?->fee_percentage ?? 10;
+                foreach ($subject->topics as $topic) {
+                    $topicData = [
+                        'code' => $topic->topic_code,
+                        'name' => $topic->topic_name,
+                        'subtopics' => []
+                    ];
 
-        return view('admin.pricingmanagement.index', compact('grades', 'platformFee'));
+                    foreach ($topic->subtopics as $subtopic) {
+                        $pricing = $subtopic->pricing;
+                        $subData = [
+                            'code' => $subtopic->subtopic_code,
+                            'name' => $subtopic->subtopic_name,
+                            'minPrice' => $pricing ? $pricing->min_price : 0,
+                            'maxPrice' => $pricing ? $pricing->max_price : 0,
+                            'status' => 'Active' // Hardcoded; add a status field to subtopics if needed
+                        ];
+
+                        $topicData['subtopics'][] = $subData;
+                    }
+
+                    $subjectData['topics'][] = $topicData;
+                }
+
+                $grade['subjects'][] = $subjectData;
+            }
+
+            $grades[] = $grade;
+        }
+
+        return view('admin.PricingManagement.index', compact('grades', 'platformFee'));
     }
 }
