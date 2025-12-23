@@ -81,6 +81,8 @@ Route::middleware(['web','auth','role:admin'])->prefix('admin')->name('admin.')-
     Route::delete('/roadmaps/subtopic/{subtopic}', [RoadmapController::class, 'deleteSubtopic'])->name('roadmaps.delete-subtopic');
 
     Route::get('/pricing-management', [PricingManagementController::class, 'index'])->name('pricing-management.index');
+    Route::put('/admin/platform-fee', [PricingManagementController::class, 'updatePlatformFee'])->name('platform-fee.update');
+    Route::post('/admin/subtopic-pricing/update', [PricingManagementController::class, 'updateSubtopicPrice']);
 });
 
 

@@ -49,6 +49,6 @@ class PricingManagementController extends Controller
 
         $platformFee = PlatformFee::first()?->fee_percentage ?? 10;
 
-        return view('admin.pricing-management.index', compact('grades', 'platformFee'));
+        return view('admin.pricingmanagement.index', compact('grades', 'platformFee'));
     }
 }
