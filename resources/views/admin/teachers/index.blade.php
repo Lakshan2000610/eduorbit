@@ -272,57 +272,97 @@
   }
 
   // Editing subtopics (client-side only; add AJAX for persistence if needed)
-  let editingCode = null;
-  function startEdit(code) {
-    editingCode = code;
-    const sub = getCurrentTopic().subtopics.find(s => s.code === code);
-    document.getElementById(`min-${code}`).innerHTML = `<input type="number" id="edit-min-${code}" value="${sub.minPrice}" class="border rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">`;
-    document.getElementById(`max-${code}`).innerHTML = `<input type="number" id="edit-max-${code}" value="${sub.maxPrice}" class="border rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">`;
-    document.getElementById(`edit-btn-${code}`).classList.add("hidden");
-    document.getElementById(`edit-controls-${code}`).classList.remove("hidden");
-  }
+// ... (keep existing code above)
 
-  function cancelEdit(code) {
-    editingCode = null;
-    const sub = getCurrentTopic().subtopics.find(s => s.code === code);
-    document.getElementById(`min-${code}`).textContent = sub.minPrice.toLocaleString();
-    document.getElementById(`max-${code}`).textContent = sub.maxPrice.toLocaleString();
-    document.getElementById(`edit-btn-${code}`).classList.remove("hidden");
-    document.getElementById(`edit-controls-${code}`).classList.add("hidden");
-  }
+// Editing subtopics (now with AJAX)
+let editingCode = null;
+function startEdit(code) {
+  editingCode = code;
+  const sub = getCurrentTopic().subtopics.find(s => s.code === code);
+  document.getElementById(`min-${code}`).innerHTML = `<input type="number" id="edit-min-${code}" value="${sub.minPrice}" class="border rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">`;
+  document.getElementById(`max-${code}`).innerHTML = `<input type="number" id="edit-max-${code}" value="${sub.maxPrice}" class="border rounded px-2 py-1 w-24 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">`;
+  document.getElementById(`edit-btn-${code}`).classList.add("hidden");
+  document.getElementById(`edit-controls-${code}`).classList.remove("hidden");
+}
 
-  function saveEdit(code) {
-    const minInput = document.getElementById(`edit-min-${code}`);
-    const maxInput = document.getElementById(`edit-max-${code}`);
-    const min = Number(minInput.value);
-    const max = Number(maxInput.value);
-    if (min < 0 || max < 0) {
-      alert("Prices must be positive");
-      return;
-    }
-    if (max <= min) {
-      alert("Max price must be greater than min price");
-      return;
-    }
-    // Update local data (for UI refresh)
-    getCurrentTopic().subtopics.find(s => s.code === code).minPrice = min;
-    getCurrentTopic().subtopics.find(s => s.code === code).maxPrice = max;
-    // Re-render to update parent calculations on navigation
-    renderSubtopics(getCurrentTopic());
-    alert("Subtopic prices updated successfully! (Note: This is client-side only; implement AJAX save for persistence.)");
-  }
+function cancelEdit(code) {
+  editingCode = null;
+  const sub = getCurrentTopic().subtopics.find(s => s.code === code);
+  document.getElementById(`min-${code}`).textContent = sub.minPrice.toLocaleString();
+  document.getElementById(`max-${code}`).textContent = sub.maxPrice.toLocaleString();
+  document.getElementById(`edit-btn-${code}`).classList.remove("hidden");
+  document.getElementById(`edit-controls-${code}`).classList.add("hidden");
+}
 
-  function savePlatformFee() {
-    const fee = Number(document.getElementById("platform-fee").value);
-    if (fee < 0 || fee > 100) {
-      document.getElementById("platform-msg").textContent = "Platform fee must be between 0% and 100%";
-      document.getElementById("platform-msg").className = "text-red-600";
+function saveEdit(code) {
+  const minInput = document.getElementById(`edit-min-${code}`);
+  const maxInput = document.getElementById(`edit-max-${code}`);
+  const min = Number(minInput.value);
+  const max = Number(maxInput.value);
+  if (min < 0 || max < 0) {
+    alert("Prices must be positive");
+    return;
+  }
+  if (max <= min) {
+    alert("Max price must be greater than min price");
+    return;
+  }
+  const sub = getCurrentTopic().subtopics.find(s => s.code === code);
+  fetch("{{ route('admin.subtopic-pricing.update') }}", {  // Adjust route name if no 'admin.' prefix
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+    },
+    body: JSON.stringify({
+      subtopic_id: sub.id,  // Uses the 'id' passed from controller
+      min_price: min,
+      max_price: max,
+      currency: 'LKR'  // Hardcoded; add input if needed
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update local data for UI
+      sub.minPrice = min;
+      sub.maxPrice = max;
+      renderSubtopics(getCurrentTopic());  // Refresh to recalc parents
+      alert(data.message);
     } else {
-      document.getElementById("platform-msg").textContent = "Platform fee updated successfully (Note: This is client-side only; implement AJAX save for persistence.)";
-      document.getElementById("platform-msg").className = "text-green-600";
+      alert('Error: ' + (data.message || 'Failed to save'));
     }
-  }
+  })
+  .catch(error => alert('Error: ' + error));
+}
 
+function savePlatformFee() {
+  const fee = Number(document.getElementById("platform-fee").value);
+  if (fee < 0 || fee > 100) {
+    document.getElementById("platform-msg").textContent = "Platform fee must be between 0% and 100%";
+    document.getElementById("platform-msg").className = "text-red-600";
+    return;
+  }
+  fetch("{{ route('admin.platform-fee.update') }}", {  // Adjust route name if no 'admin.' prefix
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+    },
+    body: JSON.stringify({ fee_percentage: fee })
+  })
+  .then(response => response.json())
+  .then(data => {
+    document.getElementById("platform-msg").textContent = data.message;
+    document.getElementById("platform-msg").className = data.success ? "text-green-600" : "text-red-600";
+  })
+  .catch(error => {
+    document.getElementById("platform-msg").textContent = "Error: " + error;
+    document.getElementById("platform-msg").className = "text-red-600";
+  });
+}
+
+// ... (keep existing code below)
   // Initial render
   renderGrades();
 </script>

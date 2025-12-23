@@ -62,7 +62,7 @@
     </div>
 </div>
 
-@push('styles')
+
 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.0/dist/tailwind.min.css" rel="stylesheet">
 <style>
     input[type="number"] { text-align: right; }
@@ -73,9 +73,7 @@
     .text-muted-foreground { color: #6b7280; }
     .text-foreground { color: #111827; }
 </style>
-@endpush
 
-@push('scripts')
 <script>
     // Real data from Laravel controller
     const pricingData = @json($grades);
@@ -366,5 +364,5 @@
     // Initial load
     renderGrades();
 </script>
-@endpush
+
 @endsection

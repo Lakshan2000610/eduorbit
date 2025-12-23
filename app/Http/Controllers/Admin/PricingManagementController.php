@@ -47,6 +47,7 @@ class PricingManagementController extends Controller
                     foreach ($topic->subtopics as $subtopic) {
                         $pricing = $subtopic->pricing;
                         $subData = [
+                            'id' => $subtopic->id, // ADD THIS LINE: Pass the subtopic ID for AJAX updates
                             'code' => $subtopic->subtopic_code,
                             'name' => $subtopic->subtopic_name,
                             'minPrice' => $pricing ? $pricing->min_price : 0,
