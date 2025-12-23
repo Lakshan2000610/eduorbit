@@ -337,27 +337,31 @@
         document.getElementById(`edit-controls-${code}`).classList.add("hidden");
     }
 
-    function saveEdit(code) {
-        const min = Number(document.getElementById(`edit-min-${code}`).value);
-        const max = Number(document.getElementById(`edit-max-${code}`).value);
-
-        if (min < 0 || max < 0) {
-            alert("Prices must be positive");
-            return;
-        }
-        if (max <= min) {
-            alert("Max price must be greater than min price");
-            return;
-        }
-
-        // TODO: Replace this with real AJAX call later
-        const sub = getCurrentTopic().subtopics.find(s => s.code === code);
-        sub.minPrice = min;
-        sub.maxPrice = max;
-
-        renderSubtopics(getCurrentTopic());
-        alert("Price updated locally! (Connect to backend for permanent save)");
+   function savePlatformFee() {
+    const fee = Number(document.getElementById("platform-fee").value);
+    if (fee < 0 || fee > 100) {
+        document.getElementById("platform-msg").textContent = "Platform fee must be between 0% and 100%";
+        document.getElementById("platform-msg").className = "text-red-600";
+        return;
     }
+    fetch('{{ route("admin.platform-fee.update") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ fee_percentage: fee })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById("platform-msg").textContent = data.message;
+        document.getElementById("platform-msg").className = data.success ? "text-green-600" : "text-red-600";
+    })
+    .catch(error => {
+        document.getElementById("platform-msg").textContent = "Error: " + error;
+        document.getElementById("platform-msg").className = "text-red-600";
+    });
+}
 
     // Initial load
     renderGrades();

@@ -4,6 +4,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Subject;
 use App\Models\PlatformFee;
+use App\Models\SubtopicPricing;
+use Illuminate\Support\Facades\Validator;
 
 class PricingManagementController extends Controller
 {
@@ -66,4 +68,81 @@ class PricingManagementController extends Controller
 
         return view('admin.PricingManagement.index', compact('grades', 'platformFee'));
     }
+
+    public function updateSubtopicPricing(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'subtopic_id' => 'required|exists:subtopics,id',
+            'min_price' => 'required|numeric|min:0',
+            'max_price' => 'required|numeric|gt:min_price',
+            'currency' => 'nullable|string|size:3|in:LKR,USD,EUR', // Adjust allowed currencies as needed
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $pricing = SubtopicPricing::updateOrCreate(
+                ['subtopic_id' => $request->subtopic_id],
+                [
+                    'min_price' => $request->min_price,
+                    'max_price' => $request->max_price,
+                    'currency' => $request->currency ?? 'LKR',
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Subtopic pricing updated successfully',
+                'data' => $pricing
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update pricing: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+   
+    public function updatePlatformFee(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'fee_percentage' => 'required|numeric|between:0,100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $fee = PlatformFee::updateOrCreate(
+                ['id' => 1], // Assuming single record; adjust if multiple
+                [
+                    'fee_percentage' => $request->fee_percentage,
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Platform fee updated successfully',
+                'data' => $fee
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update platform fee: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 }
