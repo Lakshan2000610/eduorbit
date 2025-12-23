@@ -1,3 +1,4 @@
+{{-- resources/views/teacher/gigs/index.blade.php --}}
 @extends('layouts.teacher')
 
 @section('title', 'My Gigs')
@@ -24,7 +25,7 @@
         </div>
     @endif
 
-    @if(Auth::user()->gigs->count() === 0)
+    @if($gigs->count() === 0)
         <div class="text-center py-12 bg-white rounded-lg shadow">
             <p class="text-gray-500 text-lg mb-4">You haven't created any gigs yet.</p>
             <a href="{{ route('teacher.gigs.create') }}" class="text-indigo-600 hover:underline font-medium">
@@ -33,13 +34,13 @@
         </div>
     @else
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            @foreach(Auth::user()->gigs as $gig)
+            @foreach($gigs as $gig)
                 <div class="bg-white rounded-lg shadow hover:shadow-lg transition p-6">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h3 class="text-xl font-semibold">{{ $gig->title }}</h3>
                             <p class="text-sm text-gray-600 mt-1">
-                                Grade {{ $gig->grade }} • {{ $gig->subject }}
+                                Grade {{ $gig->grade }} • {{ $gig->subjects->first()?->subject?->subject_name ?? 'Multiple Subjects' }}
                             </p>
                         </div>
 
@@ -51,9 +52,13 @@
                                     class="px-4 py-2 rounded-lg border text-sm font-medium focus:ring-2 focus:ring-indigo-500
                                         {{ $gig->status === 'active' ? 'bg-green-100 text-green-800 border-green-300' :
                                            ($gig->status === 'draft' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                                           'bg-gray-100 text-gray-800 border-gray-300') }}">
-                                <option value="active" {{ $gig->status === 'active' ? 'selected' : '' }}>Active</option>
+                                           ($gig->status === 'pending' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                           ($gig->status === 'rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                           'bg-gray-100 text-gray-800 border-gray-300'))) }}">
                                 <option value="draft" {{ $gig->status === 'draft' ? 'selected' : '' }}>Draft</option>
+                                <option value="pending" {{ $gig->status === 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="active" {{ $gig->status === 'active' ? 'selected' : '' }}>Active</option>
+                                <option value="rejected" {{ $gig->status === 'rejected' ? 'selected' : '' }}>Rejected</option>
                                 <option value="disabled" {{ $gig->status === 'disabled' ? 'selected' : '' }}>Disabled</option>
                             </select>
                         </form>
@@ -62,17 +67,24 @@
                     <p class="text-gray-600 mb-4 line-clamp-3">{{ $gig->description }}</p>
 
                     <div class="text-sm space-y-2 text-gray-600">
-                        <p><strong>Languages:</strong> {{ implode(', ', $gig->languages) }}</p>
-                        <p><strong>Duration:</strong> {{ $gig->session_duration }} minutes</p>
+                        <p><strong>Languages:</strong> {{ $gig->languages->pluck('language')->implode(', ') }}</p>
+                        <p><strong>Total Duration:</strong> {{ $gig->total_duration_formatted ?? '0M' }}</p> {{-- Updated: Use pre-computed from controller --}}
                     </div>
 
                     <div class="mt-6 flex gap-3">
-                        <a href="#" class="flex-1 text-center bg-gray-100 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium">
+                        <a href="{{ route('teacher.gigs.show', $gig) }}" class="flex-1 text-center bg-gray-100 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium">
                             View Details
                         </a>
-                        <a href="#" class="flex-1 text-center bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 text-sm font-medium">
+                        <a href="{{ route('teacher.gigs.edit', $gig) }}" class="flex-1 text-center bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 text-sm font-medium">
                             Edit
                         </a>
+                        <form action="{{ route('teacher.gigs.destroy', $gig) }}" method="POST" class="flex-1" onsubmit="return confirm('Are you sure you want to delete this gig? This action cannot be undone.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="w-full bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 text-sm font-medium">
+                                Delete
+                            </button>
+                        </form>
                     </div>
                 </div>
             @endforeach

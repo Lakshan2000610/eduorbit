@@ -12,12 +12,35 @@ use App\Models\Subtopic;
 
 class GigController extends Controller
 {
-    public function index()
-    {
-        $gigs = Auth::user()->gigs()->latest()->get();
+public function index()
+{
+    $gigs = Auth::user()->gigs()
+        ->with(['languages', 'subjects.subject', 'subjects.topics.topic', 'subjects.topics.subtopics.subtopic'])
+        ->latest()
+        ->get()
+        ->map(function ($gig) {
+            $totalMinutes = $gig->subjects
+                ->flatMap(fn($subject) => $subject->topics
+                    ->flatMap(fn($topic) => [$topic->duration] + $topic->subtopics->pluck('duration')->toArray())
+                )
+                ->sum();
+            $gig->total_duration_formatted = $this->formatTime($totalMinutes); // Add helper below
+            return $gig;
+        });
 
-        return view('teacher.gigs.index', compact('gigs'));
-    }
+    return view('teacher.gigs.index', compact('gigs'));
+}
+
+// Add this helper method to GigController
+private function formatTime($minutes)
+{
+    if ($minutes === 0) return '0M';
+    $hours = floor($minutes / 60);
+    $mins = $minutes % 60;
+    $str = $hours > 0 ? $hours . 'H ' : '';
+    $str .= $mins > 0 ? $mins . 'M' : '';
+    return trim($str);
+}
 
     public function create()
     {
@@ -31,20 +54,23 @@ class GigController extends Controller
 
     public function getSubjects(Request $request)
     {
+        $gradeNumber = $request->get('grade'); // e.g., "1", "11"
         
-        $grade = $request->get('grade');
+        // Convert to the format stored in DB: "Grade 1", "Grade 11"
+        $grade = $gradeNumber ? 'Grade ' . $gradeNumber : null;
+
         $languages = $request->get('languages') ? explode(',', $request->get('languages')) : [];
-        
+
         if (!$grade || empty($languages)) {
             return response()->json([]);
         }
-        
-        $subjects = subject::where('grade', $grade)
+
+        $subjects = Subject::where('grade', $grade)
             ->whereIn('language', $languages)
+            ->where('status', 'active')
             ->orderBy('subject_name')
-            ->get(['id', 'subject_name']);
-        
-        
+            ->get(['id', 'subject_name', 'language']);
+
         return response()->json($subjects);
     }
 
@@ -73,41 +99,91 @@ class GigController extends Controller
 
         $subtopics = Subtopic::whereIn('topic_id', $topicIds)
             ->orderBy('subtopic_name')
-            ->get(['id', 'subtopic_name']);
+            ->get(['id', 'subtopic_name', 'topic_id']);
 
         return response()->json($subtopics);
     }
 
-    public function store(Request $request)
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'title'            => 'required|string|max:255',
+        'description'      => 'required|string',
+        'grade'            => 'required|integer|between:1,13',
+        'languages'        => 'required|array|min:1',
+        'languages.*'      => 'in:Sinhala,English,Tamil',
+        'structured_data'  => 'required|json',
+    ]);
+
+    // Decode structured selections from frontend
+    $selections = json_decode($request->structured_data, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($selections['selections'] ?? [])) {
+        return back()->withErrors(['structured_data' => 'Invalid structured data.']);
+    }
+
+    $selections = $selections['selections'];
+
+    if (empty($selections)) {
+        return back()->withErrors(['structured_data' => 'At least one subject with topics is required.']);
+    }
+
+    // Create main gig
+    $gig = Auth::user()->gigs()->create([
+        'title'            => $validated['title'],
+        'description'      => $validated['description'],
+        'grade'            => $validated['grade'],
+        'status'           => 'pending',
+    ]);
+
+    // Save languages
+    foreach ($validated['languages'] as $language) {
+        $gig->languages()->create(['language' => $language]);
+    }
+
+    // Save subjects + topics + subtopics with durations
+    foreach ($selections as $selection) {
+        if (empty($selection['topics'] ?? [])) {  // Skip empty topics
+            continue;
+        }
+        $gigSubject = $gig->subjects()->create([
+            'subject_id' => $selection['subject_id'],
+        ]);
+
+        foreach ($selection['topics'] as $topicData) {
+            $gigTopic = $gigSubject->topics()->create([
+                'topic_id' => $topicData['topic_id'],  // Fixed: was 'id'
+                'duration' => $topicData['duration'] ?? 1,
+            ]);
+
+            if (!empty($topicData['subtopics'] ?? [])) {
+                foreach ($topicData['subtopics'] as $subtopicData) {
+                    $gigTopic->subtopics()->create([
+                        'subtopic_id' => $subtopicData['subtopic_id'],  // Fixed: was 'id'
+                        'duration'    => $subtopicData['duration'] ?? 1,
+                    ]);
+                }
+            }
+        }
+    }
+
+    return redirect()->route('teacher.gigs')->with('success', 'Gig created successfully and pending approval!');
+}
+
+ public function show(Gig $gig)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'grade' => 'required|integer|between:1,13',
-            'languages' => 'required|array|min:1',
-            'languages.*' => 'in:Sinhala,Tamil,English',
-            'session_duration' => 'required|integer|min:30|max:180',
-            'selected_subjects' => 'required|array|min:1',
-            'selected_subjects.*' => 'exists:subjects,id',
-            'selected_topics' => 'nullable|array',
-            'selected_topics.*' => 'nullable|exists:topics,id',
-            'selected_subtopics' => 'nullable|array',
-            'selected_subtopics.*' => 'nullable|exists:subtopics,id',
+        if ($gig->teacher_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Load with all relations
+        $gig->load([
+            'languages',
+            'subjects.subject',
+            'subjects.topics.topic',
+            'subjects.topics.subtopics.subtopic'
         ]);
 
-        Auth::user()->gigs()->create([
-            'title' => $validated['title'],
-            'description' => $validated['description'],
-            'grade' => $validated['grade'],
-            'languages' => $validated['languages'],
-            'session_duration' => $validated['session_duration'],
-            'selected_subjects' => $validated['selected_subjects'],
-            'selected_topics' => $validated['selected_topics'] ?? null,
-            'selected_subtopics' => $validated['selected_subtopics'] ?? null,
-            'status' => 'active',
-        ]);
-
-        return redirect()->route('teacher.gigs')->with('success', 'Gig created successfully!');
+        return view('teacher.gigs.show', compact('gig'));
     }
 
     public function edit(Gig $gig)
@@ -121,44 +197,63 @@ class GigController extends Controller
         // Get distinct languages from subjects table
         $languages = Subject::distinct()->where('status', 'active')->pluck('language')->sort()->values();
 
-        return view('teacher.gigs.edit', compact('gig', 'grades', 'languages'));
-    }
+        // Pre-load existing data for JS to repopulate
+        $existingLanguages = $gig->languages->pluck('language')->toArray();
+        $existingSelections = [];
 
-    public function update(Request $request, Gig $gig)
-    {
-        if ($gig->teacher_id !== Auth::id()) {
-            abort(403, 'Unauthorized action.');
+        foreach ($gig->subjects as $gigSubject) {
+            $selection = [
+                'language' => $gigSubject->subject->language ?? 'Unknown',
+                'subject_id' => $gigSubject->subject_id,
+                'subject_name' => $gigSubject->subject->subject_name ?? 'Unknown',
+                'topics' => []
+            ];
+
+            foreach ($gigSubject->topics as $gigTopic) {
+                $topicData = [
+                    'topic_id' => $gigTopic->topic_id,
+                    'topic_name' => $gigTopic->topic->topic_name ?? 'Unknown',
+                    'duration' => $gigTopic->duration,
+                    'subtopics' => []
+                ];
+
+                foreach ($gigTopic->subtopics as $gigSubtopic) {
+                    $topicData['subtopics'][] = [
+                        'subtopic_id' => $gigSubtopic->subtopic_id,
+                        'subtopic_name' => $gigSubtopic->subtopic->subtopic_name ?? 'Unknown',
+                        'duration' => $gigSubtopic->duration
+                    ];
+                }
+
+                $selection['topics'][] = $topicData;
+            }
+
+            $existingSelections[] = $selection;
         }
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'grade' => 'required|integer|between:1,13',
-            'languages' => 'required|array|min:1',
-            'languages.*' => 'in:Sinhala,Tamil,English',
-            'session_duration' => 'required|integer|min:30|max:180',
-            'selected_subjects' => 'required|array|min:1',
-            'selected_subjects.*' => 'exists:subjects,id',
-            'selected_topics' => 'nullable|array',
-            'selected_topics.*' => 'nullable|exists:topics,id',
-            'selected_subtopics' => 'nullable|array',
-            'selected_subtopics.*' => 'nullable|exists:subtopics,id',
-        ]);
-
-        $gig->update([
-            'title' => $validated['title'],
-            'description' => $validated['description'],
-            'grade' => $validated['grade'],
-            'languages' => $validated['languages'],
-            'session_duration' => $validated['session_duration'],
-            'selected_subjects' => $validated['selected_subjects'],
-            'selected_topics' => $validated['selected_topics'] ?? null,
-            'selected_subtopics' => $validated['selected_subtopics'] ?? null,
-        ]);
-
-        return redirect()->route('teacher.gigs')->with('success', 'Gig updated successfully!');
+        return view('teacher.gigs.edit', compact('gig', 'grades', 'languages', 'existingLanguages', 'existingSelections'));
     }
 
+
+// Update the update method in GigController.php
+public function update(Request $request, Gig $gig)
+{
+    if ($gig->teacher_id !== Auth::id()) {
+        abort(403, 'Unauthorized action.');
+    }
+
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+    ]);
+
+    $gig->update([
+        'title' => $validated['title'],
+        'description' => $validated['description'],
+    ]);
+
+    return redirect()->route('teacher.gigs')->with('success', 'Gig updated successfully!');
+}
     public function updateStatus(Request $request, Gig $gig)
     {
         if ($gig->teacher_id !== Auth::id()) {
@@ -166,11 +261,22 @@ class GigController extends Controller
         }
 
         $request->validate([
-            'status' => 'required|in:active,draft,disabled'
+            'status' => 'required|in:draft,pending,active,rejected,disabled'
         ]);
 
         $gig->update(['status' => $request->status]);
 
         return back()->with('success', 'Gig status updated successfully!');
+    }
+
+    public function destroy(Gig $gig)
+    {
+        if ($gig->teacher_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $gig->delete();  // Cascades to relations
+
+        return back()->with('success', 'Gig deleted successfully!');
     }
 }

@@ -2,41 +2,31 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use App\Models\GigLanguage;
+use App\Models\GigSubject;
 
 class Gig extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'title',
-        'description',
-        'grade',
-        'languages',
-        'session_duration',
-        'selected_subjects',
-        'selected_topics',
-        'selected_subtopics',
-        'status',
-        'teacher_id',
+        'teacher_id', 'title', 'description', 'grade', 'status'
     ];
 
-    protected $casts = [
-        'languages' => 'array',
-        'selected_subjects' => 'array',
-        'selected_topics' => 'array',
-        'selected_subtopics' => 'array',
-    ];
-
-    public function teacher(): BelongsTo
+    public function teacher()
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    public function gigs()
+    public function languages()
     {
-        return $this->hasMany(Gig::class, 'teacher_id');
+        return $this->hasMany(GigLanguage::class);
+    }
+
+    public function subjects()
+    {
+        return $this->hasMany(GigSubject::class);
     }
 }

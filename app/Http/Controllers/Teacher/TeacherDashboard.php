@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Auth;
 
 class TeacherDashboard extends Controller
 {
-    public function __invoke()
+    public function index()
     {
         $teacher = Auth::user();
 
