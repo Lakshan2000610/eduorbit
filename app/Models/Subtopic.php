@@ -33,4 +33,9 @@ class Subtopic extends Model
     {
         return $this->hasMany(LearningOutcome::class);
     }
+
+    public function pricing()
+{
+    return $this->hasOne(SubtopicPricing::class);
+}
 }

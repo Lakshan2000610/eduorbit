@@ -94,6 +94,7 @@
                 <a href="{{ route('admin.students') }}" class="block py-2 px-3 rounded hover:bg-indigo-600 nav-item">Students</a>
                 <a href="{{ route('admin.teachers') }}" class="block py-2 px-3 rounded hover:bg-indigo-600 nav-item">Teachers</a>
                 <a href="{{ route('admin.roadmaps.index') }}" class="block py-2 px-3 rounded hover:bg-indigo-600 nav-item">Roadmap</a>
+                <a href="{{ route('admin.pricing-management.index') }}" class="block py-2 px-3 rounded hover:bg-indigo-600 nav-item">Pricing Management</a>
                 <a href="#" class="block py-2 px-3 rounded hover:bg-indigo-600 nav-item">Analysis</a>
                 <a href="#" class="block py-2 px-3 rounded hover:bg-indigo-600 nav-item">Settings</a>
             </nav>

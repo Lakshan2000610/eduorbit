@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\RoadmapController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\TeacherController;
+use App\Http\Controllers\Admin\PricingManagementController;
 
 
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
@@ -39,6 +40,7 @@ Route::middleware('auth')->group(function () {
 
 // ADMIN ROUTES
 Route::middleware(['web','auth','role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    
     Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
 
     // Roadmaps
@@ -77,6 +79,8 @@ Route::middleware(['web','auth','role:admin'])->prefix('admin')->name('admin.')-
     Route::get('/roadmaps/subtopic/{subtopic}/edit', [RoadmapController::class, 'editSubtopic'])->name('roadmaps.edit-subtopic');
     Route::post('/roadmaps/subtopic/{subtopic}', [RoadmapController::class, 'updateSubtopic'])->name('roadmaps.update-subtopic');
     Route::delete('/roadmaps/subtopic/{subtopic}', [RoadmapController::class, 'deleteSubtopic'])->name('roadmaps.delete-subtopic');
+
+    Route::get('/pricing-management', [PricingManagementController::class, 'index'])->name('pricing-management.index');
 });
 
 
