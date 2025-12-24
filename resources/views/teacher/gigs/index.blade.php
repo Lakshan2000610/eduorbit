@@ -68,7 +68,10 @@
 
                     <div class="text-sm space-y-2 text-gray-600">
                         <p><strong>Languages:</strong> {{ $gig->languages->pluck('language')->implode(', ') }}</p>
-                        <p><strong>Total Duration:</strong> {{ $gig->total_duration_formatted ?? '0M' }}</p> {{-- Updated: Use pre-computed from controller --}}
+                        <p><strong>Total Duration:</strong> {{ $gig->total_duration_formatted ?? '0M' }}</p>
+                        {{-- NEW: Price Display --}}
+                        <p><strong>Price Range:</strong> {{ $gig->price_summary['range'] }}</p>
+                        <p><strong>Total Estimated Price:</strong> LKR {{ $gig->price_summary['total'] }}</p>
                     </div>
 
                     <div class="mt-6 flex gap-3">

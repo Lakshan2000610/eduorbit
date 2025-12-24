@@ -113,8 +113,11 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
     Route::get('/gigs/{gig}', [GigController::class, 'show'])->name('gigs.show');
     // Add this route to your routes file (in the teacher group)
     Route::delete('/gigs/{gig}', [GigController::class, 'destroy'])->name('gigs.destroy');
-    Route::get('/gig-subtopic-pricing', [GigController::class, 'getSubtopicPricing'])->name('teacher.gig-subtopic-pricing');
-    // ... other routes ...
+    // NEW/ FIXED: Pricing Route (ensure it's inside the group!)
+    Route::get('/gig-subtopic-pricing', [GigController::class, 'getSubtopicPricing'])->name('gig-subtopic-pricing');
+    Route::post('/gig-subtopic-duration', [GigController::class, 'updateGigSubtopicDuration'])->name('gig-subtopic-duration');
+    Route::post('/gig-subtopic-price', [GigController::class, 'updateGigSubtopicPrice'])->name('gig-subtopic-price');
+    Route::post('/gigs/{gig}/update-structure', [GigController::class, 'updateGigStructure'])->name('gigs.update-structure');
     // Student Requests
     Route::get('/requests', [RequestController::class, 'index'])->name('requests');
 

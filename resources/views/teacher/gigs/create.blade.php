@@ -514,6 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // NEW: Fetch pricing for all subtopics
                 const allSubtopicIds = allSubtopics.map(st => st.id).join(',');
                 if (allSubtopicIds) {
+                    // In loadTopicsAndSubtopics() function:
                     const pricingResponse = await fetch(`{{ route('teacher.gig-subtopic-pricing') }}?subtopic_ids=${allSubtopicIds}`);
                     pricingMap = await pricingResponse.json(); // {subtopic_id: {min_price, max_price, currency}}
                 }
