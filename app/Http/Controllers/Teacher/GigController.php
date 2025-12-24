@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Models\Subtopic;
+use App\Models\SubtopicPricing;
 
 class GigController extends Controller
 {
@@ -104,71 +105,87 @@ private function formatTime($minutes)
         return response()->json($subtopics);
     }
 
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'title'            => 'required|string|max:255',
-        'description'      => 'required|string',
-        'grade'            => 'required|integer|between:1,13',
-        'languages'        => 'required|array|min:1',
-        'languages.*'      => 'in:Sinhala,English,Tamil',
-        'structured_data'  => 'required|json',
-    ]);
+    public function getSubtopicPricing(Request $request)
+    {
+        $subtopicIds = $request->get('subtopic_ids') ? explode(',', $request->get('subtopic_ids')) : [];
 
-    // Decode structured selections from frontend
-    $selections = json_decode($request->structured_data, true);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($selections['selections'] ?? [])) {
-        return back()->withErrors(['structured_data' => 'Invalid structured data.']);
-    }
-
-    $selections = $selections['selections'];
-
-    if (empty($selections)) {
-        return back()->withErrors(['structured_data' => 'At least one subject with topics is required.']);
-    }
-
-    // Create main gig
-    $gig = Auth::user()->gigs()->create([
-        'title'            => $validated['title'],
-        'description'      => $validated['description'],
-        'grade'            => $validated['grade'],
-        'status'           => 'pending',
-    ]);
-
-    // Save languages
-    foreach ($validated['languages'] as $language) {
-        $gig->languages()->create(['language' => $language]);
-    }
-
-    // Save subjects + topics + subtopics with durations
-    foreach ($selections as $selection) {
-        if (empty($selection['topics'] ?? [])) {  // Skip empty topics
-            continue;
+        if (empty($subtopicIds)) {
+            return response()->json([]);
         }
-        $gigSubject = $gig->subjects()->create([
-            'subject_id' => $selection['subject_id'],
+
+        $pricings = SubtopicPricing::whereIn('subtopic_id', $subtopicIds)
+            ->get(['subtopic_id', 'min_price', 'max_price', 'currency'])
+            ->keyBy('subtopic_id');
+
+        return response()->json($pricings);
+    }
+
+public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title'            => 'required|string|max:255',
+            'description'      => 'required|string',
+            'grade'            => 'required|integer|between:1,13',
+            'languages'        => 'required|array|min:1',
+            'languages.*'      => 'in:Sinhala,English,Tamil',
+            'structured_data'  => 'required|json',
         ]);
 
-        foreach ($selection['topics'] as $topicData) {
-            $gigTopic = $gigSubject->topics()->create([
-                'topic_id' => $topicData['topic_id'],  // Fixed: was 'id'
-                'duration' => $topicData['duration'] ?? 1,
+        // Decode structured selections from frontend
+        $selections = json_decode($request->structured_data, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($selections['selections'] ?? [])) {
+            return back()->withErrors(['structured_data' => 'Invalid structured data.']);
+        }
+
+        $selections = $selections['selections'];
+
+        if (empty($selections)) {
+            return back()->withErrors(['structured_data' => 'At least one subject with topics is required.']);
+        }
+
+        // Create main gig
+        $gig = Auth::user()->gigs()->create([
+            'title'            => $validated['title'],
+            'description'      => $validated['description'],
+            'grade'            => $validated['grade'],
+            'status'           => 'pending',
+        ]);
+
+        // Save languages
+        foreach ($validated['languages'] as $language) {
+            $gig->languages()->create(['language' => $language]);
+        }
+
+        // Save subjects + topics + subtopics with durations AND prices
+        foreach ($selections as $selection) {
+            if (empty($selection['topics'] ?? [])) {  // Skip empty topics
+                continue;
+            }
+            $gigSubject = $gig->subjects()->create([
+                'subject_id' => $selection['subject_id'],
             ]);
 
-            if (!empty($topicData['subtopics'] ?? [])) {
-                foreach ($topicData['subtopics'] as $subtopicData) {
-                    $gigTopic->subtopics()->create([
-                        'subtopic_id' => $subtopicData['subtopic_id'],  // Fixed: was 'id'
-                        'duration'    => $subtopicData['duration'] ?? 1,
-                    ]);
+            foreach ($selection['topics'] as $topicData) {
+                $gigTopic = $gigSubject->topics()->create([
+                    'topic_id' => $topicData['topic_id'],
+                    'duration' => $topicData['duration'] ?? 1,
+                ]);
+
+                if (!empty($topicData['subtopics'] ?? [])) {
+                    foreach ($topicData['subtopics'] as $subtopicData) {
+                        $gigTopic->subtopics()->create([  // Updated to include price
+                            'subtopic_id' => $subtopicData['subtopic_id'],
+                            'duration'    => $subtopicData['duration'] ?? 1,
+                            'price'       => $subtopicData['price'] ?? null,  // From frontend slider
+                        ]);
+                    }
                 }
             }
         }
+
+        return redirect()->route('teacher.gigs')->with('success', 'Gig created successfully and pending approval!');
     }
-
-    return redirect()->route('teacher.gigs')->with('success', 'Gig created successfully and pending approval!');
-}
-
+    
  public function show(Gig $gig)
     {
         if ($gig->teacher_id !== Auth::id()) {

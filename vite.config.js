@@ -5,10 +5,13 @@ export default defineConfig({
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
-            refresh: true,
+            refresh: false, // IMPORTANT
         }),
     ],
     server: {
-        hmr: true,
+        hmr: {
+            protocol: 'ws',
+            host: 'localhost',
+        },
     },
 });

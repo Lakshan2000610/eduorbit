@@ -13,12 +13,13 @@ return new class extends Migration
     {
         Schema::create('gig_subtopics', function (Blueprint $table) {
             $table->id();
-        $table->foreignId('gig_topic_id')->constrained()->onDelete('cascade');
-        $table->foreignId('subtopic_id')->constrained()->onDelete('cascade');
-        $table->integer('duration')->default(1);
-        $table->timestamps();
+            $table->foreignId('gig_topic_id')->constrained()->onDelete('cascade');
+            $table->foreignId('subtopic_id')->constrained()->onDelete('cascade');
+            $table->integer('duration')->default(1);
+            $table->decimal('price', 10, 2)->default(0); // NEW: Price field for subtopic pricing
+            $table->timestamps();
 
-        $table->unique(['gig_topic_id', 'subtopic_id']);
+            $table->unique(['gig_topic_id', 'subtopic_id']);
         });
     }
 

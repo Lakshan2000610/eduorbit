@@ -124,7 +124,7 @@
                                     <!-- Topics will be populated via JS -->
                                 </div>
                             </div>
-                            <!-- Selected Topics with Duration -->
+                            <!-- Selected Topics with Duration & Pricing -->
                             <div id="selectedTopicsSection" style="display: none;" class="pt-4 border-t border-gray-200">
                                 <h3 class="mb-3 text-gray-600">Selected Topics & Duration</h3>
                                 <div id="selectedTopicsList" class="space-y-3">
@@ -175,6 +175,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return str.trim();
     }
 
+    // Format price (e.g., LKR 500)
+    function formatPrice(price) {
+        return `LKR ${parseFloat(price).toLocaleString()}`;
+    }
+
     // State
     let selectedLanguages = [];
     let subjectSelections = [];
@@ -183,6 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let availableSubjects = []; // Fetched subjects
     let availableTopics = []; // For active subject
     let subtopicsMap = {}; // topic_id -> [{id, subtopic_name}]
+    let pricingMap = {}; // subtopic_id -> {min_price, max_price, currency}
 
     // DOM Elements
     const gradeSelect = document.getElementById('grade');
@@ -278,6 +284,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const subtopicId = parseInt(e.target.dataset.subtopic);
             const duration = parseInt(e.target.value) || 0;
             updateSubtopicDuration(topicId, subtopicId, duration);
+        }
+    });
+
+    // NEW: Subtopic price slider change
+    document.addEventListener('input', (e) => {
+        if (e.target.classList.contains('subtopic-price-slider')) {
+            const topicId = parseInt(e.target.dataset.topic);
+            const subtopicId = parseInt(e.target.dataset.subtopic);
+            const price = parseFloat(e.target.value);
+            updateSubtopicPrice(topicId, subtopicId, price);
         }
     });
 
@@ -494,8 +510,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     subtopicsMap[st.topic_id].push({ id: st.id, name: st.subtopic_name });
                 });
+
+                // NEW: Fetch pricing for all subtopics
+                const allSubtopicIds = allSubtopics.map(st => st.id).join(',');
+                if (allSubtopicIds) {
+                    const pricingResponse = await fetch(`{{ route('teacher.gig-subtopic-pricing') }}?subtopic_ids=${allSubtopicIds}`);
+                    pricingMap = await pricingResponse.json(); // {subtopic_id: {min_price, max_price, currency}}
+                }
             } else {
                 subtopicsMap = {};
+                pricingMap = {};
             }
 
             // Add availableTopics to activeSubject for reference
@@ -503,7 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             populateTopics();
         } catch (error) {
-            console.error('Error loading topics/subtopics:', error);
+            console.error('Error loading topics/subtopics/pricing:', error);
         }
     }
 
@@ -549,6 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSelectedTopicsList();
     }
 
+
     function toggleTopicExpansion(topicId) {
         expandedTopic = expandedTopic === topicId ? null : topicId;
         populateTopics();
@@ -578,7 +603,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         topicObj.subtopics.push({
                             subtopic_id: subtopic.id,
                             subtopic_name: subtopic.name,
-                            duration: 30 // Default 30 min
+                            duration: 30, // Default 30 min
+                            price: subtopic.minPrice // NEW: Default to minPrice
                         });
                     }
                 });
@@ -600,12 +626,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!topicObj) return;
         const subtopicExists = topicObj.subtopics.find(st => st.subtopic_id === subtopicId);
         if (!subtopicExists) {
-            const subtopicName = subtopicsMap[topicId]?.find(s => s.id === subtopicId)?.name;
-            if (subtopicName) {
+            const subtopicData = subtopicsMap[topicId]?.find(s => s.id === subtopicId);
+            if (subtopicData) {
                 topicObj.subtopics.push({
                     subtopic_id: subtopicId,
-                    subtopic_name: subtopicName,
-                    duration: 30 // Default 30 min
+                    subtopic_name: subtopicData.name,
+                    duration: 30, // Default 30 min
+                    price: subtopicData.minPrice // NEW: Default to minPrice
                 });
                 recalculateTopicDuration(topicId);
             }
@@ -627,6 +654,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 subObj.duration = duration;
             }
             recalculateTopicDuration(topicId);
+        }
+        const selIndex = subjectSelections.findIndex(s => s.subject_id === activeSubject.subject_id);
+        if (selIndex > -1) {
+            subjectSelections[selIndex] = activeSubject;
+        }
+        updateSelectedTopicsList();
+    }
+
+    // NEW: Update subtopic price
+function updateSubtopicPrice(topicId, subtopicId, price) {
+        if (!activeSubject) return;
+        const topicObj = activeSubject.topics.find(t => t.topic_id === topicId);
+        if (topicObj) {
+            const subObj = topicObj.subtopics.find(st => st.subtopic_id === subtopicId);
+            if (subObj) {
+                subObj.price = price;
+            }
         }
         const selIndex = subjectSelections.findIndex(s => s.subject_id === activeSubject.subject_id);
         if (selIndex > -1) {
@@ -703,7 +747,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setActiveSubject(activeSubject); // Re-render
     }
 
-    function updateSelectedTopicsList() {
+function updateSelectedTopicsList() {
         if (!activeSubject || activeSubject.topics.length === 0) {
             selectedTopicsSection.style.display = 'none';
             return;
@@ -739,21 +783,33 @@ document.addEventListener('DOMContentLoaded', function() {
                             </button>
                         </div>
                         <div class="subtopics-content space-y-2" data-topic="${topicObj.topic_id}" style="display: block;">
-                            ${topicObj.subtopics.map(subtopicObj => `
-                                <div class="flex items-center gap-4 bg-white border border-gray-200 rounded-lg p-3">
-                                    <div class="flex-1">
-                                        <span class="text-sm text-gray-700">${subtopicObj.subtopic_name}</span>
+                            ${topicObj.subtopics.map(subtopicObj => {
+                                const pricing = pricingMap[subtopicObj.subtopic_id] || { min_price: 0, max_price: 0 };
+                                const minPrice = parseFloat(pricing.min_price) || 0;
+                                const maxPrice = parseFloat(pricing.max_price) || 0;
+                                const currentPrice = subtopicObj.price || minPrice; // Default to min
+                                return `
+                                    <div class="flex items-center gap-4 bg-white border border-gray-200 rounded-lg p-3">
+                                        <div class="flex-1">
+                                            <span class="text-sm text-gray-700">${subtopicObj.subtopic_name}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <select class="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 subtopic-duration-select" data-topic="${topicObj.topic_id}" data-subtopic="${subtopicObj.subtopic_id}">
+                                                ${durationOptions.map(opt => `<option value="${opt.value}" ${subtopicObj.duration === opt.value ? 'selected' : ''}>${opt.text}</option>`).join('')}
+                                            </select>
+                                            <!-- NEW: Price Slider -->
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-xs text-gray-600">Price:</label>
+                                                <input type="range" min="${minPrice}" max="${maxPrice}" step="1" value="${currentPrice}" class="w-20 subtopic-price-slider" data-topic="${topicObj.topic_id}" data-subtopic="${subtopicObj.subtopic_id}">
+                                                <span class="text-xs text-gray-700 ml-1">${formatPrice(currentPrice)}</span>
+                                            </div>
+                                            <button type="button" class="p-1 text-red-500 hover:bg-red-100 rounded remove-subtopic" data-topic="${topicObj.topic_id}" data-subtopic="${subtopicObj.subtopic_id}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <select class="w-32 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 subtopic-duration-select" data-topic="${topicObj.topic_id}" data-subtopic="${subtopicObj.subtopic_id}">
-                                            ${durationOptions.map(opt => `<option value="${opt.value}" ${subtopicObj.duration === opt.value ? 'selected' : ''}>${opt.text}</option>`).join('')}
-                                        </select>
-                                        <button type="button" class="p-1 text-red-500 hover:bg-red-100 rounded remove-subtopic" data-topic="${topicObj.topic_id}" data-subtopic="${subtopicObj.subtopic_id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 ` : ''}
@@ -785,7 +841,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitSection.style.display = (hasGrade && hasSelections) ? 'flex' : 'none';
     }
 
-    function handleSubmit() {
+function handleSubmit() {
         if (!gradeSelect.value || subjectSelections.length === 0) {
             alert('Please select a grade and at least one subject with topics.');
             return;
@@ -803,12 +859,12 @@ document.addEventListener('DOMContentLoaded', function() {
             form.appendChild(inp);
         });
 
-        // Add structured data
+        // Add structured data (now includes prices)
         const structuredInput = document.createElement('input');
         structuredInput.type = 'hidden';
         structuredInput.name = 'structured_data';
         structuredInput.value = JSON.stringify({
-            selections: subjectSelections
+            selections: subjectSelections  // Prices are in subtopics array
         });
         form.appendChild(structuredInput);
 

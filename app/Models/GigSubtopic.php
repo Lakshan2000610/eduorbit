@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class GigSubtopic extends Model
 {
-    protected $fillable = ['gig_topic_id', 'subtopic_id', 'duration'];
+    protected $fillable = ['gig_topic_id', 'subtopic_id', 'duration', 'price']; // ADDED: 'price'
 
     public function gigTopic()
     {
